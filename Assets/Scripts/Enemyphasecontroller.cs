@@ -233,7 +233,7 @@ public class EnemyPhaseController : MonoBehaviour
 
         foreach (var entry in travelCost)
         {
-            if (ManhattanBetween(entry.Key, target.Cell) > enemy.attackRange) continue;
+            if (!enemy.CanAttackFrom(entry.Key, target, target.Cell)) continue;
 
             if (entry.Value < bestTravel)
             {

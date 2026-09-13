@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 559a611b10c2460488c77a0a4f62716c, type: 3}
   m_Name: Oshawott
   m_EditorClassIdentifier: Assembly-CSharp::UnitDefinition
-  unitName: Unit
+  unitName: Oshawott
   prefab: {fileID: 3874814375831555866, guid: f0c84ebcb9ec857488e9514903011364, type: 3}
   maxHP: 30
   attack: 5

@@ -8,6 +8,7 @@ using UnityEngine.TestTools;
 public class CombatTests
 {
     private readonly List<GameObject> objects = new List<GameObject>();
+    private readonly List<ScriptableObject> assets = new List<ScriptableObject>();
     private GridManager grid;
     private TurnManager turns;
     private Unit player;
@@ -38,6 +39,8 @@ public class CombatTests
         for (int i = objects.Count - 1; i >= 0; i--)
             if (objects[i] != null) Object.Destroy(objects[i]);
         objects.Clear();
+        foreach (var asset in assets) Object.Destroy(asset);
+        assets.Clear();
         yield return null;
     }
 
@@ -148,6 +151,108 @@ public class CombatTests
         Assert.That(turns.CanEndPlayerPhase, Is.True);
     }
 
+    private T CreateAsset<T>() where T : ScriptableObject
+    {
+        T asset = ScriptableObject.CreateInstance<T>();
+        assets.Add(asset);
+        return asset;
+    }
+
+    [Test]
+    public void SpecialWeapon_UsesSpecialDefense_AndAddsMight()
+    {
+        player.equippedWeapon.damageType = DamageCategory.Special;
+        player.equippedWeapon.might = 4;
+        enemy.stats.physDef = 8;
+        enemy.stats.specDef = 1;
+        Assert.That(player.PreviewAttack(enemy).damage, Is.EqualTo(8));
+        player.Attack(enemy);
+        Assert.That(enemy.currentHP, Is.EqualTo(12));
+    }
+
+    [Test]
+    public void Bow_RejectsAdjacentTarget_AndPreventsMeleeCounterAtTwoTiles()
+    {
+        player.equippedWeapon.minRange = player.equippedWeapon.maxRange = 2;
+        Assert.That(player.CanAttack(enemy), Is.False);
+        Assert.That(enemy.TryWarpTo(new Vector2Int(3, 1)), Is.True);
+        Assert.That(player.CanAttack(enemy), Is.True);
+        Assert.That(player.PreviewAttack(enemy).targetCounters, Is.False);
+    }
+
+    [TestCase(3, 17)]
+    [TestCase(4, 14)]
+    [TestCase(-4, 17)]
+    public void SpeedThreshold_FollowUpsMatchProjection(int difference, int remaining)
+    {
+        player.stats.speed = Mathf.Max(0, difference);
+        enemy.stats.speed = Mathf.Max(0, -difference);
+        var f = player.PreviewAttack(enemy);
+        player.Attack(enemy);
+        Assert.That(enemy.currentHP, Is.EqualTo(remaining));
+        Assert.That(enemy.currentHP, Is.EqualTo(f.targetHPAfter));
+        Assert.That(player.currentHP, Is.EqualTo(f.attackerHPAfter));
+    }
+
+    [Test]
+    public void Miss_GrantsInitiationCharge_ButNoDamageOrReceivedCharge()
+    {
+        player.EquipSpecial(CreateAsset<SpecialAttackData>());
+        enemy.EquipSpecial(CreateAsset<SpecialAttackData>());
+        player.equippedWeapon.baseHit = enemy.equippedWeapon.baseHit = 0;
+        player.Attack(enemy);
+        Assert.That(player.currentHP, Is.EqualTo(20));
+        Assert.That(enemy.currentHP, Is.EqualTo(20));
+        Assert.That(player.currentBurstPips, Is.EqualTo(1));
+        Assert.That(enemy.currentBurstPips, Is.Zero);
+    }
+
+    [Test]
+    public void Critical_TriplesDamage_AndKOGrantsBonusCharge()
+    {
+        player.EquipSpecial(CreateAsset<SpecialAttackData>());
+        player.equippedWeapon.baseCrit = 100;
+        enemy.currentHP = 9;
+        player.Attack(enemy);
+        Assert.That(enemy.currentHP, Is.Zero);
+        Assert.That(player.currentBurstPips, Is.EqualTo(2));
+    }
+
+    [Test]
+    public void ChargedSpecial_BypassesArmor_PreventsCounters_AndCannotCrit()
+    {
+        var special = CreateAsset<SpecialAttackData>();
+        special.bypassesArmor = special.preventsCounter = true;
+        special.damageMultiplier = 2;
+        player.EquipSpecial(special);
+        Assert.That(player.Attack(enemy, true), Is.Empty);
+        player.GainBurstPip(99);
+        player.equippedWeapon.baseCrit = 100;
+        var f = player.PreviewAttack(enemy, player.Cell, true);
+        Assert.That(f.critChance, Is.Zero);
+        Assert.That(f.targetCounters, Is.False);
+        Assert.That(player.currentBurstPips, Is.EqualTo(3));
+        player.Attack(enemy, true);
+        Assert.That(enemy.currentHP, Is.EqualTo(10));
+        Assert.That(player.currentHP, Is.EqualTo(20));
+        Assert.That(player.currentBurstPips, Is.EqualTo(1));
+        player.EquipSpecial(null);
+        Assert.That(player.currentBurstPips, Is.Zero);
+        Assert.That(player.MaxBurstPips, Is.Zero);
+    }
+
+    [Test]
+    public void LegacyStats_DeserializeIntoStruct_AndDefinitionCopiesIndependently()
+    {
+        var definition = CreateAsset<UnitDefinition>();
+        JsonUtility.FromJsonOverwrite("{\"maxHP\":32,\"attack\":9,\"defense\":7,\"moveRange\":6}", definition);
+        definition.ApplyTo(player);
+        Assert.That(player.maxHP, Is.EqualTo(32));
+        Assert.That(player.stats.specDef, Is.EqualTo(7));
+        player.stats.attack = 1;
+        Assert.That(definition.baseStats.attack, Is.EqualTo(9));
+    }
+
     private void AssertEndTurnIsBlocked()
     {
         Assert.That(turns.IsPlayerActionInProgress, Is.True);
@@ -190,6 +295,8 @@ public class CombatTests
         unit.unitName = name;
         unit.team = team;
         unit.maxHP = unit.currentHP = 20;
+        unit.equippedWeapon = CreateAsset<WeaponData>();
+        unit.equippedWeapon.baseHit = 200; // Guarantee existing deterministic assertions.
         return unit;
     }
 }

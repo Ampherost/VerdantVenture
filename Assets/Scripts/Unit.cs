@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 public enum Team { Player, Enemy }
 
@@ -11,19 +12,41 @@ public enum Team { Player, Enemy }
 /// A unit holds exactly one cell at a time. PlaceAt() releases the previous cell before
 /// claiming a new one, so teleports / reinforcements / rescue can't leak occupancy.
 /// </summary>
-public class Unit : MonoBehaviour
+public class Unit : MonoBehaviour, ISerializationCallbackReceiver
 {
     [Header("Identity")]
     public string unitName = "Unit";
     public Team team = Team.Player;
 
     [Header("Stats")]
-    public int maxHP = 20;
-    public int currentHP = 20;
-    public int attack = 5;
-    public int defense = 2;
-    public int moveRange = 4;
-    public int attackRange = 1;
+    public UnitStats stats = UnitStats.Default;
+    public WeaponData equippedWeapon;
+    public SpecialAttackData equippedSpecial;
+    public int maxHP { get => stats.maxHP; set => stats.maxHP = value; }
+    public int currentHP { get => stats.currentHP; set => stats.currentHP = value; }
+    public int attack { get => stats.attack; set => stats.attack = value; }
+    public int moveRange { get => stats.moveRange; set => stats.moveRange = value; }
+    public int defense { get => stats.physDef; set { stats.physDef = value; stats.specDef = value; } }
+    public int AttackRange => equippedWeapon != null ? equippedWeapon.maxRange : 1;
+    public int MinAttackRange => equippedWeapon != null ? equippedWeapon.minRange : 1;
+    public int attackRange => AttackRange;
+
+    // Import old flat serialized stats once. Existing script properties forward to the struct.
+    [SerializeField, HideInInspector, FormerlySerializedAs("maxHP")] private int legacy_maxHP = -1;
+    [SerializeField, HideInInspector, FormerlySerializedAs("currentHP")] private int legacy_currentHP = -1;
+    [SerializeField, HideInInspector, FormerlySerializedAs("attack")] private int legacy_attack = -1;
+    [SerializeField, HideInInspector, FormerlySerializedAs("defense")] private int legacy_defense = -1;
+    [SerializeField, HideInInspector, FormerlySerializedAs("moveRange")] private int legacy_moveRange = -1;
+    public void OnBeforeSerialize() { }
+    public void OnAfterDeserialize()
+    {
+        if (legacy_maxHP >= 0) { stats.maxHP = legacy_maxHP; legacy_maxHP = -1; }
+        if (legacy_currentHP >= 0) { stats.currentHP = legacy_currentHP; legacy_currentHP = -1; }
+        if (legacy_attack >= 0) { stats.attack = legacy_attack; legacy_attack = -1; }
+        if (legacy_defense >= 0) { stats.physDef = stats.specDef = legacy_defense; legacy_defense = -1; }
+        if (legacy_moveRange >= 0) { stats.moveRange = legacy_moveRange; legacy_moveRange = -1; }
+    }
+
 
     [Header("Movement")]
     [Tooltip("How fast the unit slides between tiles, in cells/sec.")]
@@ -230,16 +253,42 @@ public class Unit : MonoBehaviour
         return Mathf.Max(1, rawAttack - defense);
     }
 
-    /// <summary>Standard FE-ish damage: attacker.attack - target.defense, min 1.</summary>
-    public void TakeDamage(int rawAttack)
+    /// <summary>Legacy physical raw-attack entry point.</summary>
+    public void TakeDamage(int rawAttack) => ApplyDamage(ComputeDamage(rawAttack, stats.physDef));
+
+    /// <summary>Apply resolved damage without subtracting armor again.</summary>
+    public void ApplyDamage(int damage)
     {
-        int dmg = ComputeDamage(rawAttack, defense);
-        currentHP = Mathf.Max(0, currentHP - dmg);
-        Debug.Log($"{unitName} took {dmg} damage ({currentHP}/{maxHP} HP left)");
-
+        if (!IsAlive || damage <= 0) return;
+        currentHP = Mathf.Max(0, currentHP - damage);
+        GainBurstPip(1);
         OnHPChanged?.Invoke(this);
-
         if (!IsAlive) Die();
+    }
+
+    public int TotalAttackPower => stats.attack + (equippedWeapon != null ? equippedWeapon.might : 0);
+    public int TotalHitRate => (equippedWeapon != null ? equippedWeapon.baseHit : 80) + stats.skill * 2 + stats.luck / 2;
+    public int TotalAvoidRate => stats.speed * 2 + stats.luck;
+    public int TotalCritRate => (equippedWeapon != null ? equippedWeapon.baseCrit : 0) + stats.skill / 2;
+    public int CritAvoid => stats.luck;
+    public int currentBurstPips { get; private set; }
+    public int MaxBurstPips => equippedSpecial != null ? equippedSpecial.pipCost : 0;
+    public bool HasSpecial => equippedSpecial != null;
+    public bool CanUseSpecial => HasSpecial && MaxBurstPips > 0 && currentBurstPips >= MaxBurstPips;
+
+    public void GainBurstPip(int amount)
+    {
+        currentBurstPips = (int)System.Math.Min(System.Math.Max(0, MaxBurstPips),
+            (long)currentBurstPips + System.Math.Max(0, amount));
+    }
+
+    public void ConsumeBurst() => currentBurstPips = 0;
+
+    /// <summary>Changing techniques resets charge to prevent banking a cheaper gauge.</summary>
+    public void EquipSpecial(SpecialAttackData newSpecial)
+    {
+        equippedSpecial = newSpecial;
+        ConsumeBurst();
     }
 
     private void Die()
@@ -281,96 +330,18 @@ public class Unit : MonoBehaviour
         if (target.team == team) return false;               // no friendly fire
 
         int d = Mathf.Abs(myCell.x - targetCell.x) + Mathf.Abs(myCell.y - targetCell.y);
-        return d <= attackRange;
+        return d >= MinAttackRange && d <= AttackRange;
     }
 
     // ---- Attacking ----
 
-    /// <summary>Forecast an attack from where this unit is standing right now.</summary>
-    public AttackForecast PreviewAttack(Unit target)
-    {
-        return PreviewAttack(target, Cell);
-    }
-
-    /// <summary>
-    /// Work out exactly what an attack would do, changing nothing. Pass 'fromCell' to
-    /// forecast from a tile the unit hasn't moved to yet — damage doesn't depend on
-    /// position, but whether the target can counter does.
-    ///
-    /// isValid is false when the attack isn't legal; the HP fields still hold current
-    /// values, so a panel can render a greyed-out row without special-casing.
-    /// </summary>
-    public AttackForecast PreviewAttack(Unit target, Vector2Int fromCell)
-    {
-        var f = new AttackForecast
-        {
-            attacker = this,
-            target = target,
-            isValid = false,
-            attackerHPBefore = currentHP,
-            attackerHPAfter = currentHP,
-        };
-
-        if (target == null) return f;
-
-        f.targetHPBefore = target.currentHP;
-        f.targetHPAfter = target.currentHP;
-
-        if (!CanAttackFrom(fromCell, target, target.Cell)) return f;
-
-        f.isValid = true;
-        f.damage = ComputeDamage(attack, target.defense);
-        f.targetHPAfter = Mathf.Max(0, target.currentHP - f.damage);
-        f.targetDies = f.targetHPAfter <= 0;
-
-        // The target counters only if it survives and has us in reach from where it stands.
-        if (!f.targetDies && target.CanAttackFrom(target.Cell, this, fromCell))
-        {
-            f.targetCounters = true;
-            f.counterDamage = ComputeDamage(target.attack, defense);
-            f.attackerHPAfter = Mathf.Max(0, currentHP - f.counterDamage);
-            f.attackerDies = f.attackerHPAfter <= 0;
-        }
-
-        return f;
-    }
-
-    /// <summary>
-    /// Resolve an attack against 'target': this unit hits first, and if the target
-    /// survives and can reach back, it counterattacks. Returns a short battle log.
-    ///
-    /// The exchange is decided by PreviewAttack before any HP moves, so what resolves is
-    /// exactly what the forecast panel promised.
-    /// </summary>
-    public string Attack(Unit target)
-    {
-        AttackForecast f = PreviewAttack(target);
-
-        if (!f.isValid)
-        {
-            Debug.LogWarning(
-                $"[Unit] '{unitName}' was told to attack " +
-                $"'{(target != null ? target.unitName : "null")}' but the attack isn't legal.", this);
-            return string.Empty;
-        }
-
-        var log = new System.Text.StringBuilder();
-
-        target.TakeDamage(attack);
-        log.AppendLine($"{unitName} attacks {target.unitName} for {f.ActualDamage}.");
-
-        if (f.targetCounters)
-        {
-            TakeDamage(target.attack);
-            log.AppendLine($"{target.unitName} counters for {f.ActualCounterDamage}.");
-        }
-        else if (f.targetDies)
-        {
-            log.AppendLine($"{target.unitName} is defeated!");
-        }
-
-        return log.ToString().TrimEnd();
-    }
+    public AttackForecast PreviewAttack(Unit target) => PreviewAttack(target, Cell);
+    public AttackForecast PreviewAttack(Unit target, Vector2Int fromCell) =>
+        AttackForecast.Calculate(this, target, fromCell);
+    public AttackForecast PreviewAttack(Unit target, Vector2Int fromCell, bool useSpecial) =>
+        AttackForecast.Calculate(this, target, fromCell, useSpecial);
+    public string Attack(Unit target) => BattleRunner.ResolveCombat(this, target);
+    public string Attack(Unit target, bool useSpecial) => BattleRunner.ResolveCombat(this, target, useSpecial);
 
 #if UNITY_EDITOR
     // ---- Edit-time overlap warning ----

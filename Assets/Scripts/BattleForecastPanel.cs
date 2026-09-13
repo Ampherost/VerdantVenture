@@ -49,16 +49,16 @@ public class BattleForecastPanel : MonoBehaviour
         if (panel != null) panel.SetActive(true);
 
         SetText(attackerNameText, f.attacker.unitName, normalColor);
-        SetText(attackerHPText, f.AttackerHPText, f.attackerDies ? lethalColor : normalColor);
-        SetText(attackerDamageText, f.damage.ToString(), normalColor);
+        SetText(attackerHPText, f.AttackerHPText + " (normal hits)", f.attackerDies ? lethalColor : normalColor);
+        SetText(attackerDamageText, $"{f.damage} ({f.hitChance}% hit, {f.critChance}% crit)" + (f.attackerStrikes > 1 ? " + follow-up" : ""), normalColor);
 
         SetText(targetNameText, f.target.unitName, normalColor);
-        SetText(targetHPText, f.TargetHPText, f.targetDies ? lethalColor : normalColor);
+        SetText(targetHPText, f.TargetHPText + " (normal hits)", f.targetDies ? lethalColor : normalColor);
         SetText(targetDamageText, f.targetCounters ? f.counterDamage.ToString() : "—", normalColor);
 
         if (counterText != null)
         {
-            counterText.text = f.targetDies ? $"Defeats {f.target.unitName}" : f.CounterText;
+            counterText.text = f.CounterText;
             counterText.color = f.attackerDies ? lethalColor : normalColor;
         }
     }
