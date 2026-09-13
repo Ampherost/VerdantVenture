@@ -28,7 +28,8 @@ public class UnitDefinition : ScriptableObject, ISerializationCallbackReceiver
     public int currentHP { get => baseStats.currentHP; set => baseStats.currentHP = value; }
     public int attack { get => baseStats.attack; set => baseStats.attack = value; }
     public int moveRange { get => baseStats.moveRange; set => baseStats.moveRange = value; }
-    public int defense { get => baseStats.physDef; set { baseStats.physDef = value; baseStats.specDef = value; } }
+    public int defense { get => baseStats.defense; set => baseStats.defense = value; }
+    public int resistance { get => baseStats.resistance; set => baseStats.resistance = value; }
     public int AttackRange => equippedWeapon != null ? equippedWeapon.maxRange : 1;
     public int MinAttackRange => equippedWeapon != null ? equippedWeapon.minRange : 1;
     public int attackRange => AttackRange;
@@ -45,7 +46,7 @@ public class UnitDefinition : ScriptableObject, ISerializationCallbackReceiver
         if (legacy_maxHP >= 0) { baseStats.maxHP = legacy_maxHP; legacy_maxHP = -1; }
         if (legacy_currentHP >= 0) { baseStats.currentHP = legacy_currentHP; legacy_currentHP = -1; }
         if (legacy_attack >= 0) { baseStats.attack = legacy_attack; legacy_attack = -1; }
-        if (legacy_defense >= 0) { baseStats.physDef = baseStats.specDef = legacy_defense; legacy_defense = -1; }
+        if (legacy_defense >= 0) { baseStats.defense = baseStats.resistance = legacy_defense; legacy_defense = -1; }
         if (legacy_moveRange >= 0) { baseStats.moveRange = legacy_moveRange; legacy_moveRange = -1; }
     }
 

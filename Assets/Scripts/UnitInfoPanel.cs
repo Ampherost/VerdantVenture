@@ -85,7 +85,7 @@ public class UnitInfoPanel : MonoBehaviour
         if (teamText != null) teamText.text = shown.team == Team.Player ? "Ally" : "Enemy";
         if (hpText != null) hpText.text = $"HP  {shown.currentHP}/{shown.maxHP}";
         if (attackText != null) attackText.text = $"ATK  {shown.TotalAttackPower}";
-        if (defenseText != null) defenseText.text = $"DEF  {shown.stats.physDef} / RES  {shown.stats.specDef}";
+        if (defenseText != null) defenseText.text = $"Def  {shown.stats.defense} / Res  {shown.stats.resistance}";
         if (moveText != null) moveText.text = $"MOV  {shown.moveRange}";
         if (rangeText != null) rangeText.text = $"RNG  {shown.MinAttackRange}-{shown.AttackRange}";
         if (statusText != null) statusText.text = shown.HasActed ? "Done" : string.Empty;

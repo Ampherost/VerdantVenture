@@ -12,7 +12,7 @@ public struct AttackForecast
     {
         int armor = attacker.equippedWeapon != null &&
             attacker.equippedWeapon.damageType == DamageCategory.Special
-            ? defender.stats.specDef : defender.stats.physDef;
+            ? defender.stats.resistance : defender.stats.defense;
         if (special != null && special.bypassesArmor) armor = 0;
         int damage = Unit.ComputeDamage(attacker.TotalAttackPower, armor);
         return special == null ? damage : Mathf.Max(1,

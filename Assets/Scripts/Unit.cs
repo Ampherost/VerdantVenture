@@ -26,7 +26,8 @@ public class Unit : MonoBehaviour, ISerializationCallbackReceiver
     public int currentHP { get => stats.currentHP; set => stats.currentHP = value; }
     public int attack { get => stats.attack; set => stats.attack = value; }
     public int moveRange { get => stats.moveRange; set => stats.moveRange = value; }
-    public int defense { get => stats.physDef; set { stats.physDef = value; stats.specDef = value; } }
+    public int defense { get => stats.defense; set => stats.defense = value; }
+    public int resistance { get => stats.resistance; set => stats.resistance = value; }
     public int AttackRange => equippedWeapon != null ? equippedWeapon.maxRange : 1;
     public int MinAttackRange => equippedWeapon != null ? equippedWeapon.minRange : 1;
     public int attackRange => AttackRange;
@@ -43,7 +44,7 @@ public class Unit : MonoBehaviour, ISerializationCallbackReceiver
         if (legacy_maxHP >= 0) { stats.maxHP = legacy_maxHP; legacy_maxHP = -1; }
         if (legacy_currentHP >= 0) { stats.currentHP = legacy_currentHP; legacy_currentHP = -1; }
         if (legacy_attack >= 0) { stats.attack = legacy_attack; legacy_attack = -1; }
-        if (legacy_defense >= 0) { stats.physDef = stats.specDef = legacy_defense; legacy_defense = -1; }
+        if (legacy_defense >= 0) { stats.defense = stats.resistance = legacy_defense; legacy_defense = -1; }
         if (legacy_moveRange >= 0) { stats.moveRange = legacy_moveRange; legacy_moveRange = -1; }
     }
 
@@ -254,7 +255,7 @@ public class Unit : MonoBehaviour, ISerializationCallbackReceiver
     }
 
     /// <summary>Legacy physical raw-attack entry point.</summary>
-    public void TakeDamage(int rawAttack) => ApplyDamage(ComputeDamage(rawAttack, stats.physDef));
+    public void TakeDamage(int rawAttack) => ApplyDamage(ComputeDamage(rawAttack, stats.defense));
 
     /// <summary>Apply resolved damage without subtracting armor again.</summary>
     public void ApplyDamage(int damage)

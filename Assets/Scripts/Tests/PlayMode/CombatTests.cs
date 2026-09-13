@@ -159,12 +159,12 @@ public class CombatTests
     }
 
     [Test]
-    public void SpecialWeapon_UsesSpecialDefense_AndAddsMight()
+    public void SpecialWeapon_UsesResistance_AndAddsMight()
     {
         player.equippedWeapon.damageType = DamageCategory.Special;
         player.equippedWeapon.might = 4;
-        enemy.stats.physDef = 8;
-        enemy.stats.specDef = 1;
+        enemy.stats.defense = 8;
+        enemy.stats.resistance = 1;
         Assert.That(player.PreviewAttack(enemy).damage, Is.EqualTo(8));
         player.Attack(enemy);
         Assert.That(enemy.currentHP, Is.EqualTo(12));
@@ -248,7 +248,7 @@ public class CombatTests
         JsonUtility.FromJsonOverwrite("{\"maxHP\":32,\"attack\":9,\"defense\":7,\"moveRange\":6}", definition);
         definition.ApplyTo(player);
         Assert.That(player.maxHP, Is.EqualTo(32));
-        Assert.That(player.stats.specDef, Is.EqualTo(7));
+        Assert.That(player.stats.resistance, Is.EqualTo(7));
         player.stats.attack = 1;
         Assert.That(definition.baseStats.attack, Is.EqualTo(9));
     }
