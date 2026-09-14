@@ -1,6 +1,6 @@
-# Explorers of Verdaneth
+# Verdant Venture
 
-**Explorers of Verdaneth** is a full-fledged 2D indie **adventure-fantasy RPG** that blends **strategic, turn-based grid combat** with classic **top-down exploration** and **deep party management**.
+**Verdant Venture** is a full-fledged 2D indie **adventure-fantasy RPG** that blends **strategic, turn-based grid combat** with classic **top-down exploration** and **deep party management**.
 
 Set in the rich, war-torn continent of **Verdaneth**, you’ll lead a growing band of explorers through a land divided by rebellion, noble oppression, and ancient secrets waiting to be unearthed.
 
