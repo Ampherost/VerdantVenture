@@ -312,7 +312,14 @@ public class BattleRunner : MonoBehaviour
         resultsWritten = true;
 
         BattleLauncher.RecordResult(encounter, winner);
-        WriteResultsToParty(winner == Team.Player);
+        GameData data = GameData.Instance;
+        if (data != null)
+            PartyResultWriter.Write(deployed, winner == Team.Player, new PartyRules
+            {
+                permadeath = data.permadeath,
+                reviveHP = data.reviveHP,
+                healAfterBattle = data.healAfterBattle
+            }, data.HealAll);
 
         // Nothing else happens here — CombatHUD's buttons drive what comes next.
     }
@@ -323,57 +330,8 @@ public class BattleRunner : MonoBehaviour
         if (leaving) return;
         leaving = true;
 
-        RestorePreBattleHP();
+        PartyResultWriter.Restore(hpBeforeBattle);
         SceneManager.LoadScene(SceneManager.GetActiveScene().name);
-    }
-
-    /// <summary>
-    /// Push each deployed unit's final HP back onto its party member.
-    ///
-    /// Permadeath only applies to a won battle: a total party wipe is treated as a retreat,
-    /// otherwise a single loss would empty the roster and leave the game unwinnable.
-    /// </summary>
-    private void WriteResultsToParty(bool victory)
-    {
-        GameData data = GameData.Instance;
-        if (data == null) return;
-
-        foreach (var pair in deployed)
-        {
-            Unit unit = pair.Key;
-            PartyMember member = pair.Value;
-            if (member == null) continue;
-
-            // A destroyed GameObject compares equal to null; treat that as a casualty.
-            member.currentHP = unit == null ? 0 : Mathf.Max(0, unit.currentHP);
-
-            if (member.currentHP <= 0)
-            {
-                if (victory && data.permadeath)
-                {
-                    member.isDead = true;
-                    Debug.Log($"[BattleRunner] {member.Name} was lost for good.");
-                    continue;
-                }
-
-                member.currentHP = Mathf.Clamp(data.reviveHP, 1, member.MaxHP);
-                Debug.Log($"[BattleRunner] {member.Name} fell but was recovered " +
-                          $"({member.currentHP} HP).");
-            }
-        }
-
-        if (victory && data.healAfterBattle) data.HealAll();
-    }
-
-    /// <summary>Undo the writeback, so retrying a lost battle starts from the same HP.</summary>
-    private void RestorePreBattleHP()
-    {
-        foreach (var pair in hpBeforeBattle)
-        {
-            if (pair.Key == null) continue;
-            pair.Key.currentHP = pair.Value;
-            pair.Key.isDead = false;
-        }
     }
 
     // ---- Leaving ----
@@ -405,7 +363,7 @@ public class BattleRunner : MonoBehaviour
 
         if (!victory && defeatAction == DefeatAction.RetryBattle)
         {
-            RestorePreBattleHP();
+            PartyResultWriter.Restore(hpBeforeBattle);
             SceneManager.LoadScene(SceneManager.GetActiveScene().name);
             return;
         }
