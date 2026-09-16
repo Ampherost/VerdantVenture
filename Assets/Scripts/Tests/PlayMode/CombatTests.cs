@@ -253,6 +253,59 @@ public class CombatTests
         Assert.That(definition.baseStats.attack, Is.EqualTo(9));
     }
 
+    [TestCase(49, 19, 11)] // Hit and critical: 3 damage tripled.
+    [TestCase(49, 20, 17)] // A roll equal to crit chance is not a critical.
+    [TestCase(50, 0, 20)]  // A roll equal to hit chance misses.
+    public void Resolver_InjectedRolls_ControlHitAndCriticalBoundaries(int hit, int crit, int hp)
+    {
+        player.equippedWeapon.baseHit = 50;
+        player.equippedWeapon.baseCrit = 20;
+        enemy.equippedWeapon.baseHit = 0;
+        var rolls = new Queue<int>(hit < 50 ? new[] { hit, crit, 99 } : new[] { hit, 99 });
+
+        CombatResolver.ResolveCombat(player, enemy, () => rolls.Dequeue());
+
+        Assert.That(enemy.currentHP, Is.EqualTo(hp));
+        Assert.That(player.currentHP, Is.EqualTo(20));
+        Assert.That(rolls, Is.Empty, "Misses must not consume a critical roll.");
+    }
+
+    [Test]
+    public void Resolver_SpecialSkipsCritRoll_AndFollowUpUsesOrdinaryDamage()
+    {
+        var special = CreateAsset<SpecialAttackData>();
+        special.preventsCounter = true;
+        special.damageMultiplier = 2;
+        player.EquipSpecial(special);
+        player.GainBurstPip(99);
+        player.stats.speed = 4;
+        player.equippedWeapon.baseCrit = 20;
+        var rolls = new Queue<int>(new[] { 0, 0, 19 });
+
+        CombatResolver.ResolveCombat(player, enemy, () => rolls.Dequeue(), useSpecial: true);
+
+        Assert.That(enemy.currentHP, Is.EqualTo(5)); // Special 6, then ordinary critical 9.
+        Assert.That(player.currentHP, Is.EqualTo(20));
+        Assert.That(player.currentBurstPips, Is.EqualTo(1));
+        Assert.That(rolls, Is.Empty);
+    }
+
+    [Test]
+    public void Resolver_InvalidAttack_DoesNotRollOrGrantCharge()
+    {
+        player.EquipSpecial(CreateAsset<SpecialAttackData>());
+        enemy.team = Team.Player;
+
+        string log = CombatResolver.ResolveCombat(player, enemy, () =>
+        {
+            Assert.Fail("Invalid attacks must not roll.");
+            return 0;
+        });
+
+        Assert.That(log, Is.Empty);
+        Assert.That(player.currentBurstPips, Is.Zero);
+        Assert.That(enemy.currentHP, Is.EqualTo(20));
+    }
     private void AssertEndTurnIsBlocked()
     {
         Assert.That(turns.IsPlayerActionInProgress, Is.True);

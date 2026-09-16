@@ -341,8 +341,8 @@ public class Unit : MonoBehaviour, ISerializationCallbackReceiver
         AttackForecast.Calculate(this, target, fromCell);
     public AttackForecast PreviewAttack(Unit target, Vector2Int fromCell, bool useSpecial) =>
         AttackForecast.Calculate(this, target, fromCell, useSpecial);
-    public string Attack(Unit target) => BattleRunner.ResolveCombat(this, target);
-    public string Attack(Unit target, bool useSpecial) => BattleRunner.ResolveCombat(this, target, useSpecial);
+    public string Attack(Unit target) => CombatResolver.ResolveCombat(this, target, () => UnityEngine.Random.Range(0, 100));
+    public string Attack(Unit target, bool useSpecial) => CombatResolver.ResolveCombat(this, target, () => UnityEngine.Random.Range(0, 100), useSpecial);
 
 #if UNITY_EDITOR
     // ---- Edit-time overlap warning ----
