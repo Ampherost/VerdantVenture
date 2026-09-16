@@ -356,41 +356,13 @@ public class BattleRunner : MonoBehaviour
         }
         leaving = true;
 
-        bool victory = BattleLauncher.LastWinner == Team.Player;
-        DefeatAction defeatAction = encounter != null
-            ? encounter.onDefeat
-            : DefeatAction.ReturnToOverworld;
-
-        if (!victory && defeatAction == DefeatAction.RetryBattle)
-        {
-            PartyResultWriter.Restore(hpBeforeBattle);
-            SceneManager.LoadScene(SceneManager.GetActiveScene().name);
-            return;
-        }
-
-        if (!victory && defeatAction == DefeatAction.LoadGameOverScene &&
-            encounter != null && !string.IsNullOrWhiteSpace(encounter.gameOverSceneName))
-        {
-            BattleLauncher.ClearPending();
-            SceneManager.LoadScene(encounter.gameOverSceneName);
-            return;
-        }
-
-        // Everything else: back to the overworld.
-        BattleLauncher.ClearPending();
-        SceneManager.LoadScene(ResolveReturnScene());
-    }
-
-    private string ResolveReturnScene()
-    {
-        if (encounter != null && !string.IsNullOrWhiteSpace(encounter.returnSceneName))
-            return encounter.returnSceneName;
-
         GameData data = GameData.Instance;
-        if (data != null && !string.IsNullOrWhiteSpace(data.returnSceneName))
-            return data.returnSceneName;
-
-        Debug.LogWarning("[BattleRunner] No return scene recorded — defaulting to OverworldScene.");
-        return "OverworldScene";
+        ExitDecision decision = BattleExitRouter.Decide(BattleLauncher.LastWinner == Team.Player,
+            encounter, SceneManager.GetActiveScene().name, data != null ? data.returnSceneName : null);
+        if (decision.Route == ExitRoute.Retry)
+            PartyResultWriter.Restore(hpBeforeBattle);
+        else
+            BattleLauncher.ClearPending();
+        SceneManager.LoadScene(decision.SceneName);
     }
 }
