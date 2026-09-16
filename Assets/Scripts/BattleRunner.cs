@@ -1,7 +1,6 @@
 using System.Collections;
 using UnityEngine;
 using UnityEngine.SceneManagement;
-
 /// <summary>
 /// Builds the battle, then takes it apart again. Put one of these in the combat scene.
 ///
@@ -26,80 +25,58 @@ using UnityEngine.SceneManagement;
 public class BattleRunner : MonoBehaviour
 {
     public static BattleRunner Instance { get; private set; }
-
     [Header("Testing")]
     [Tooltip("Used only when you press Play in this scene directly with no encounter " +
              "launched. Leave empty to keep the units you hand-placed in the scene.")]
     public EncounterData debugEncounter;
-
     [Header("Return Flow")]
     [Tooltip("Head back automatically once the battle resolves. Turn this off if you'd " +
              "rather CombatHUD's result panel wait for a Continue button — wire that " +
              "button to BattleRunner.ReturnNow().")]
     public bool autoReturn = true;
-
     [Tooltip("Beat before leaving, so the player can read the result banner.")]
     [Min(0f)] public float returnDelaySeconds = 2.5f;
-
     private EncounterData encounter;
-
     private Deployment deployment = new Deployment();
-
     private bool resultsWritten;
     private bool leaving;
-
-    // ---- Setup ----
-
     private void Awake()
     {
         Instance = this;
-
         encounter = BattleLauncher.Pending != null ? BattleLauncher.Pending : debugEncounter;
-
         if (encounter == null)
         {
             Debug.Log("[BattleRunner] No encounter active — running whatever units are already " +
                       "in the scene. (This is normal when you press Play in the combat scene.)");
             return;
         }
-
         deployment = BattleSpawner.Spawn(encounter, GameData.Instance, this);
         ObjectiveFactory.Install(encounter, deployment, transform);
     }
-
     private void Start()
     {
         BattleSpawner.Place(deployment, GridManager.Instance);
-
         if (TurnManager.Instance == null)
         {
             Debug.LogError("[BattleRunner] No TurnManager in this scene — the battle can never " +
                            "end, so we'd never return to the overworld.", this);
             return;
         }
-
         TurnManager.Instance.OnCombatEnd += HandleCombatEnd;
-
         // Vanishingly unlikely, but a zero-enemy encounter can resolve before we subscribe.
         if (TurnManager.Instance.CombatOver)
             HandleCombatEnd(TurnManager.Instance.Winner);
     }
-
     private void OnDestroy()
     {
         if (TurnManager.Instance != null)
             TurnManager.Instance.OnCombatEnd -= HandleCombatEnd;
-
         if (Instance == this) Instance = null;
     }
-
-    // ---- Results ----
-
     private void HandleCombatEnd(Team? winner)
     {
         if (resultsWritten) return;
         resultsWritten = true;
-
         BattleLauncher.RecordResult(encounter, winner);
         GameData data = GameData.Instance;
         if (data != null)
@@ -109,32 +86,22 @@ public class BattleRunner : MonoBehaviour
                 reviveHP = data.reviveHP,
                 healAfterBattle = data.healAfterBattle
             }, data.HealAll);
-
-        // Nothing else happens here — CombatHUD's buttons drive what comes next.
+        if (autoReturn) StartCoroutine(ReturnAfterDelay());
     }
-
     /// <summary>Restart this battle from the party's pre-battle HP. Backs the Retry button.</summary>
     public void Retry()
     {
         if (leaving) return;
         leaving = true;
-
         PartyResultWriter.Restore(deployment.hpBeforeBattle);
         SceneManager.LoadScene(SceneManager.GetActiveScene().name);
     }
-
-    // ---- Leaving ----
-
     private IEnumerator ReturnAfterDelay()
     {
         yield return new WaitForSeconds(returnDelaySeconds);
         ReturnNow();
     }
-
-    /// <summary>
-    /// Leave the battle. Public so a Continue button on the result panel can call it when
-    /// autoReturn is off.
-    /// </summary>
+    /// <summary>Leave the battle; also backs the HUD Continue button.</summary>
     public void ReturnNow()
     {
         if (leaving) return;
@@ -144,7 +111,6 @@ public class BattleRunner : MonoBehaviour
             return;
         }
         leaving = true;
-
         GameData data = GameData.Instance;
         ExitDecision decision = BattleExitRouter.Decide(BattleLauncher.LastWinner == Team.Player,
             encounter, SceneManager.GetActiveScene().name, data != null ? data.returnSceneName : null);
