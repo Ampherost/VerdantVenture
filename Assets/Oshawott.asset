@@ -14,8 +14,20 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::UnitDefinition
   unitName: Oshawott
   prefab: {fileID: 3874814375831555866, guid: f0c84ebcb9ec857488e9514903011364, type: 3}
-  maxHP: 30
-  attack: 5
-  defense: 2
-  moveRange: 4
-  attackRange: 1
+  baseStats:
+    maxHP: 30
+    currentHP: 20
+    attack: 5
+    defense: 2
+    resistance: 2
+    speed: 3
+    skill: 3
+    luck: 3
+    moveRange: 4
+  equippedWeapon: {fileID: 0}
+  equippedSpecial: {fileID: 0}
+  legacy_maxHP: -1
+  legacy_currentHP: -1
+  legacy_attack: -1
+  legacy_defense: -1
+  legacy_moveRange: -1
