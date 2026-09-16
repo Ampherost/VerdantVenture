@@ -1,67 +1,105 @@
 # 04 · Sequence — overworld → battle → overworld
 
-The full encounter round-trip, including the execution-order trick in `BattleRunner`.
+The encounter round-trip, including setup order and guarded automatic/manual exits.
 
 ```mermaid
 sequenceDiagram
     autonumber
     actor Player
-    participant PI as PlayerInteractions
-    participant NPC as NPCScript
-    participant DM as DialogueManager
     participant ET as EncounterTrigger
-    participant BL as BattleLauncher (static)
+    participant BL as BattleLauncher
     participant GD as GameData
     participant SM as Unity SceneManager
     participant BR as BattleRunner
+    participant BS as BattleSpawner
+    participant D as Deployment
+    participant OF as ObjectiveFactory
     participant TM as TurnManager
     participant U as Unit
+    participant PW as PartyResultWriter
+    participant ER as BattleExitRouter
     participant HUD as CombatHUD
 
-    Player->>PI: press E near NPC
-    PI->>NPC: Interact(player)
-    NPC->>DM: ShowDialogue(lines, choice)
-    Player->>DM: pick "Yes"
-    DM->>ET: onOptionA → Begin()
+    Player->>ET: dialogue choice → Begin()
     ET->>BL: Begin(encounter)
     BL->>BL: encounter.Validate()
     BL->>GD: SetReturnPoint(scene, playerPos)
     BL->>SM: LoadScene(combatSceneName)
 
-    Note over BR,U: Combat scene loads
-    BR->>BL: read Pending
-    BR->>GD: read Party
-    BR->>U: SpawnParty() / SpawnEnemies()  (Awake, order -100)
-    TM->>TM: Awake: sweep scene for Units
-    BR->>U: set positions  (Start, order -100)
+    Note over BR,U: Combat scene loads; BattleRunner execution order is -100
+    BR->>BL: Awake: read Pending (else debugEncounter)
+    alt encounter exists
+        BR->>BS: Spawn(encounter, GameData.Instance)
+        BS->>U: deactivate/destroy hand-placed units; instantiate party/enemies
+        BS->>D: record party mapping, pre-battle HP, placement, Boss
+        BS-->>BR: Deployment
+        BR->>OF: Install(encounter, deployment, transform)
+        OF->>D: read Boss for boss objective
+        OF->>OF: create inactive object; add component; configure; activate
+        opt TurnManager already exists
+            OF->>TM: RegisterObjective(objective)
+        end
+    else standalone scene
+        Note over BR,U: Leave hand-placed units alone
+    end
+    TM->>TM: Awake: sweep active units and objectives
+    BR->>BS: Start: Place(deployment, GridManager.Instance)
+    BS->>U: set transform.position (never PlaceAt)
+    BR->>TM: subscribe OnCombatEnd; handle already-finished battle
     U->>U: Start → SnapToGrid()
-    BR->>TM: RegisterObjective(...)
-    TM-->>TM: next frame: BeginPhase(Player)
-
-    loop until CheckCombatEnd()
+    TM->>TM: next frame: BeginPhase(Player)
+    loop until CheckCombatEnd resolves
         Note over TM: Player phase / Enemy phase (see 05)
     end
 
     TM-->>BR: OnCombatEnd(winner)
+    BR->>BR: resultsWritten guard
     BR->>BL: RecordResult(encounter, winner)
-    BR->>GD: WriteResultsToParty(victory)
+    opt GameData exists
+        BR->>GD: read permadeath, reviveHP, healAfterBattle
+        BR->>PW: Write(deployed, victory, PartyRules, HealAll callback)
+        PW->>PW: write HP/death to PartyMembers
+        opt victory and healAfterBattle
+            PW->>GD: HealAll callback
+        end
+    end
+    opt autoReturn enabled
+        BR->>BR: start ReturnAfterDelay()
+    end
     TM-->>HUD: OnCombatEnd(winner) → show result panel
 
-    Player->>HUD: press Continue
-    HUD->>BR: ReturnNow()
-    alt victory, or defeat with ReturnToOverworld
-        BR->>BL: ClearPending()
-        BR->>SM: LoadScene(returnScene)
-        Note over GD: OverworldPlayerPlacer moves player to returnPosition
-        Note over ET: Awake: Cleared = (LastEncounter == encounter && victory)
-    else defeat with RetryBattle
-        BR->>BR: RestorePreBattleHP()
-        BR->>SM: reload combat scene
-    else defeat with LoadGameOverScene
-        BR->>BL: ClearPending()
-        BR->>SM: LoadScene(gameOverSceneName)
+    alt explicit HUD Retry
+        Player->>HUD: press Retry
+        HUD->>BR: Retry()
+        BR->>BR: leaving guard; set leaving
+        BR->>PW: Restore(hpBeforeBattle), clearing isDead
+        BR->>SM: reload current scene; retain Pending
+    else Continue or automatic return
+        alt HUD Continue
+            Player->>HUD: press Continue
+            HUD->>BR: ReturnNow()
+        else autoReturn enabled
+            BR->>BR: delay expires → ReturnNow()
+        end
+        Note over BR: ReturnNow stops if leaving or unresolved; otherwise sets leaving
+        BR->>ER: Decide(victory, encounter, currentScene, savedReturnScene)
+        ER-->>BR: ExitDecision (Route, SceneName)
+        alt Retry (defeat + RetryBattle)
+            BR->>PW: Restore(hpBeforeBattle), clearing isDead
+            Note over BL: Pending is retained
+        else GameOver or ReturnToOverworld
+            BR->>BL: ClearPending()
+        end
+        BR->>SM: LoadScene(decision.SceneName)
     end
+    Note over BR,SM: A later Continue/delay call stops at leaving; no second load
 ```
 
-`autoReturn` and `ReturnAfterDelay()` exist in `BattleRunner` but nothing calls them, so the only
-way out of a battle is a HUD button. Either wire them up or delete them.
+`BattleExitRouter` chooses Retry only for a defeat with `RetryBattle`. Defeat with
+`LoadGameOverScene` uses GameOver only if its name is nonblank. All other cases return
+using the encounter's return scene, then GameData's saved return scene, then `OverworldScene`.
+Victory ignores the defeat action. A draw follows the defeat path.
+
+Automatic return starts only after results are recorded and written. With `autoReturn` off,
+the HUD drives the exit. Both `Retry()` and `ReturnNow()` set `leaving` before any scene load.
+`ReturnAfterDelay` uses scaled time (`WaitForSeconds`), as before.

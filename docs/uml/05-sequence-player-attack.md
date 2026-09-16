@@ -9,7 +9,7 @@ sequenceDiagram
     participant A as Unit (attacker)
     participant AF as AttackForecast
     participant FP as BattleForecastPanel
-    participant BR as BattleRunner (static)
+    participant CR as CombatResolver (static)
     participant T as Unit (target)
     participant TM as TurnManager
 
@@ -31,17 +31,18 @@ sequenceDiagram
 
     Player->>CC: click enemy
     CC->>A: Attack(target)
-    A->>BR: ResolveCombat(attacker, target)
+    A->>CR: ResolveCombat(attacker, target, randomRoll)
     loop each strike (attacker, counter, doubles)
-        BR->>AF: HitChance / CritChance / Damage
-        BR->>T: ApplyDamage(dmg)
+        CR->>AF: HitChance / CritChance / Damage
+        CR->>T: ApplyDamage(dmg)
         T-->>T: OnHPChanged (health bar, info panel)
         opt HP reaches 0
             T->>TM: NotifyUnitDied(this)
             TM->>TM: CheckCombatEnd()
         end
     end
-    BR-->>CC: combat log string
+    CR-->>A: combat log string
+    A-->>CC: combat log string
     CC->>TM: NotifyUnitActed(attacker)
     TM->>TM: all acted? → EndPhase() → BeginPhase(Enemy)
 ```

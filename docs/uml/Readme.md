@@ -63,18 +63,15 @@ Generated from `russell-dev` @ `43cdf7c` (Sept 2026).
 These are the design issues the diagrams surface. They're candidates for your planning backlog,
 roughly in priority order.
 
-### 1. `Unit` depends on `BattleRunner` (wrong-way dependency)
-`Unit.Attack()` calls the static `BattleRunner.ResolveCombat()`. A core domain object now depends
-on a scene orchestrator whose main job is spawning and scene loading.
-**Suggestion:** move `ResolveCombat` / `ResolveStrike` into a pure static class (e.g. `CombatResolver`)
-next to `AttackForecast`. It already only uses `Unit` + `AttackForecast`, so it's a cut-and-paste
-move — and it becomes testable without a scene. Inject the random roll (`System.Func<int>`) so tests
-can force hits and crits.
+### 1. Combat resolution stays in the combat core (resolved)
+`Unit.Attack()` delegates to `CombatResolver.ResolveCombat()`, with a supplied random roll.
+Combat math no longer depends on the scene orchestrator.
 
-### 2. `BattleRunner` has too many responsibilities
-Combat math, party spawning, enemy spawning, objective installation, result write-back, and scene
-navigation all live in one 489-line class. After #1, consider splitting out
-`BattleSetup` (spawn + place + objectives) and `BattleExit` (results + scene choice).
+### 2. Battle orchestration is split into focused classes (resolved)
+`BattleRunner` handles lifecycle timing, results/exit coordination, and scene loads.
+`BattleSpawner` builds and positions a `Deployment`; `ObjectiveFactory` installs objectives;
+`PartyResultWriter` applies supplied party rules; `BattleExitRouter` chooses the exit.
+See diagrams 03 and 04 for the current class and sequence relationships.
 
 ### 3. Two turn controllers, no shared abstraction
 `CombatController` (player) and `EnemyPhaseController` (AI) each implement
@@ -99,7 +96,6 @@ The `State` enum has three values, but "moving" and "resolving attack" are repre
 scene names out by hand. A single `SceneNames` static class of constants prevents silent typos.
 
 ### 7. Dead / unfinished code
-- `BattleRunner.autoReturn`, `returnDelaySeconds`, `ReturnAfterDelay()` — never called.
 - `WeaponData.weight` — never read (carried over from the stat review).
 - `PlayerScript` — 18-line placeholder; delete or give it a job.
 - Legacy stat proxies (`maxHP`, `attack`, `defense`… on `Unit` and `UnitDefinition`) — mark `[Obsolete]` and migrate callers.

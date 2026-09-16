@@ -11,15 +11,58 @@ classDiagram
         +BattleRunner Instance$
         +EncounterData debugEncounter
         +bool autoReturn
-        -Dictionary~Unit,PartyMember~ deployed
-        +ResolveCombat(Unit attacker, Unit defender, bool useSpecial)$ string
-        -SpawnParty()
-        -SpawnEnemies()
-        -InstallObjective()
+        -Deployment deployment
+        -Awake()
+        -Start()
         -HandleCombatEnd(Team? winner)
-        -WriteResultsToParty(bool victory)
+        -ReturnAfterDelay() IEnumerator
         +Retry()
         +ReturnNow()
+    }
+    class Deployment {
+        +Dictionary deployed
+        +Dictionary hpBeforeBattle
+        +List~KeyValuePair~ pendingPlacement
+        +Unit Boss
+    }
+    class BattleSpawner {
+        <<static>>
+        +Spawn(EncounterData encounter, GameData data, Object context) Deployment
+        +Place(Deployment deployment, GridManager grid)
+    }
+    class ObjectiveFactory {
+        <<static>>
+        +Install(EncounterData encounter, Deployment deployment, Transform parent)
+    }
+    class PartyRules {
+        <<struct>>
+        +bool permadeath
+        +int reviveHP
+        +bool healAfterBattle
+    }
+    class PartyResultWriter {
+        <<static>>
+        +Write(deployed, bool victory, PartyRules rules, Action heal)
+        +Restore(hpBeforeBattle)
+    }
+    class BattleExitRouter {
+        <<static>>
+        +Decide(bool victory, EncounterData encounter, string currentScene, string returnScene) ExitDecision
+    }
+    class ExitDecision {
+        <<struct>>
+        +ExitRoute Route
+        +string SceneName
+    }
+    class ExitRoute {
+        <<enumeration>>
+        ReturnToOverworld
+        Retry
+        GameOver
+    }
+    class CombatResolver {
+        <<static>>
+        +ResolveCombat(Unit attacker, Unit defender, Func~int~ roll, bool useSpecial) string
     }
 
     class TurnManager {
@@ -121,9 +164,23 @@ classDiagram
     CombatObjective <|-- SurviveRoundsObjective
 
     BattleRunner --> EncounterData : reads
-    BattleRunner ..> CombatObjective : creates
-    BattleRunner ..> TurnManager : RegisterUnit / RegisterObjective
-    BattleRunner ..> GridManager : placement
+    BattleRunner *-- Deployment
+    BattleRunner ..> BattleSpawner : Awake spawn / Start place
+    BattleRunner ..> ObjectiveFactory : Awake install
+    BattleRunner ..> PartyResultWriter : write / restore
+    BattleRunner ..> PartyRules : copies GameData settings
+    BattleRunner ..> BattleExitRouter : decide
+    BattleExitRouter ..> ExitDecision : returns
+    ExitDecision --> ExitRoute
+    BattleSpawner ..> Deployment : creates
+    BattleSpawner ..> TurnManager : RegisterUnit
+    BattleSpawner ..> GridManager : CellToWorld
+    ObjectiveFactory ..> Deployment : reads Boss
+    ObjectiveFactory ..> CombatObjective : configure inactive then activate
+    ObjectiveFactory ..> TurnManager : RegisterObjective
+    PartyResultWriter ..> PartyRules
+    Unit ..> CombatResolver : Attack
+    CombatResolver ..> AttackForecast : combat math
     TurnManager o-- "0..*" CombatObjective
     TurnManager o-- "0..*" Unit
     GridManager o-- "0..*" Unit : occupants
@@ -143,3 +200,8 @@ classDiagram
 
 - Dashed arrows labelled with an event name point from **publisher → subscriber**. Those are the "good" couplings: `TurnManager` doesn't know who's listening.
 - `CombatController` and `EnemyPhaseController` are two *controllers of the same kind* (one per team) but share no abstraction. They each re-implement "move along path, then maybe attack, then NotifyUnitActed". That's the best candidate for a shared interface — see README.
+- `BattleRunner` owns timing and applies the chosen exit: restore HP for Retry; otherwise clear Pending; then load the chosen scene. The router never loads scenes.
+- `PartyResultWriter` receives collections, `PartyRules`, and a heal callback; it never looks up `GameData` or scene objects.
+- Boss identity comes directly from the first eligible `isBoss` spawn, without name/cell matching. Objective fields are assigned before activation and `Awake`.
+
+- `Deployment.deployed` maps Unit to PartyMember; `hpBeforeBattle` maps PartyMember to its original HP; `pendingPlacement` pairs Unit with its requested cell.
