@@ -1,0 +1,6 @@
+{
+    "name": "Verdaneth.EditModeTests",
+    "references": ["Verdaneth.Gameplay"],
+    "includePlatforms": ["Editor"],
+    "optionalUnityReferences": ["TestAssemblies"]
+}
