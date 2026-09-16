@@ -1,5 +1,4 @@
 using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -44,15 +43,7 @@ public class BattleRunner : MonoBehaviour
 
     private EncounterData encounter;
 
-    // Which party member each deployed unit represents, so HP can be written back.
-    private readonly Dictionary<Unit, PartyMember> deployed = new Dictionary<Unit, PartyMember>();
-
-    // HP before a shot was fired, so a Retry doesn't stack damage from the failed attempt.
-    private readonly Dictionary<PartyMember, int> hpBeforeBattle = new Dictionary<PartyMember, int>();
-
-    // Units spawned in Awake, positioned in Start.
-    private readonly List<KeyValuePair<Unit, Vector2Int>> pendingPlacement =
-        new List<KeyValuePair<Unit, Vector2Int>>();
+    private Deployment deployment = new Deployment();
 
     private bool resultsWritten;
     private bool leaving;
@@ -72,15 +63,13 @@ public class BattleRunner : MonoBehaviour
             return;
         }
 
-        ClearHandPlacedUnits();
-        SpawnParty();
-        SpawnEnemies();
+        deployment = BattleSpawner.Spawn(encounter, GameData.Instance, this);
         InstallObjective();
     }
 
     private void Start()
     {
-        PlaceSpawnedUnits();
+        BattleSpawner.Place(deployment, GridManager.Instance);
 
         if (TurnManager.Instance == null)
         {
@@ -105,123 +94,6 @@ public class BattleRunner : MonoBehaviour
     }
 
     /// <summary>
-    /// Remove units placed by hand in the editor — this encounter brings its own cast.
-    /// Deactivating first matters: Destroy is deferred to the end of the frame, so
-    /// TurnManager's Awake sweep would otherwise still find them. Its sweep excludes
-    /// inactive objects, so this hides them in time.
-    /// </summary>
-    private void ClearHandPlacedUnits()
-    {
-        foreach (var u in FindObjectsByType<Unit>(FindObjectsSortMode.None))
-        {
-            if (u == null) continue;
-            u.gameObject.SetActive(false);
-            Destroy(u.gameObject);
-        }
-    }
-
-    private void SpawnParty()
-    {
-        GameData data = GameData.Instance;
-        if (data == null)
-        {
-            Debug.LogError("[BattleRunner] No GameData found, so there's no party to deploy. " +
-                           "Drop the GameData prefab into your first scene.", this);
-            return;
-        }
-
-        List<Vector2Int> cells = encounter.playerSpawnCells;
-        int slots = Mathf.Min(cells.Count, encounter.maxDeployed);
-        int slot = 0;
-
-        foreach (var member in data.Party)
-        {
-            if (slot >= slots) break;
-            if (!member.IsDeployable) continue;
-
-            Unit unit = SpawnUnit(member.definition, cells[slot], Team.Player, null);
-            if (unit == null) continue;
-
-            // Carry wounds in from the last fight.
-            unit.currentHP = Mathf.Clamp(member.currentHP, 1, unit.maxHP);
-
-            deployed[unit] = member;
-            hpBeforeBattle[member] = member.currentHP;
-            slot++;
-        }
-
-        if (slot == 0)
-            Debug.LogError("[BattleRunner] Nobody was deployed. Either the party is empty, " +
-                           "everyone is at 0 HP or benched, or their definitions have no " +
-                           "prefabs assigned.", this);
-    }
-
-    private void SpawnEnemies()
-    {
-        if (encounter.enemies == null) return;
-
-        foreach (var spawn in encounter.enemies)
-        {
-            if (spawn == null || spawn.definition == null) continue;
-            SpawnUnit(spawn.definition, spawn.cell, Team.Enemy, spawn.nameOverride);
-        }
-    }
-
-    private Unit SpawnUnit(UnitDefinition def, Vector2Int cell, Team team, string nameOverride)
-    {
-        if (def == null || !def.IsSpawnable)
-        {
-            Debug.LogError($"[BattleRunner] '{(def != null ? def.name : "null")}' has no prefab " +
-                           $"with a Unit component, so it can't be spawned.", this);
-            return null;
-        }
-
-        GameObject go = Instantiate(def.prefab);
-        Unit unit = go.GetComponent<Unit>();
-
-        def.ApplyTo(unit);
-        unit.team = team;
-        if (!string.IsNullOrWhiteSpace(nameOverride)) unit.unitName = nameOverride;
-        go.name = $"{unit.unitName} [{team}]";
-
-        // Positioning waits for Start — see the class comment.
-        pendingPlacement.Add(new KeyValuePair<Unit, Vector2Int>(unit, cell));
-
-        // TurnManager's own Awake sweep normally catches this, but register anyway in case
-        // its Awake happened to run first.
-        if (TurnManager.Instance != null)
-            TurnManager.Instance.RegisterUnit(unit);
-
-        return unit;
-    }
-
-    private void PlaceSpawnedUnits()
-    {
-        GridManager grid = GridManager.Instance;
-        if (grid == null)
-        {
-            if (pendingPlacement.Count > 0)
-                Debug.LogError("[BattleRunner] No GridManager in the scene — spawned units have " +
-                               "nowhere to stand.", this);
-            return;
-        }
-
-        foreach (var pair in pendingPlacement)
-        {
-            if (pair.Key == null) continue;
-
-            if (!grid.InBounds(pair.Value))
-                Debug.LogWarning($"[BattleRunner] '{pair.Key.unitName}' is set to spawn on " +
-                                 $"{pair.Value}, which isn't part of the painted map. It'll be " +
-                                 $"nudged to the nearest free tile.", pair.Key);
-
-            pair.Key.transform.position = grid.CellToWorld(pair.Value);
-        }
-
-        pendingPlacement.Clear();
-    }
-
-    /// <summary>
     /// Build the win condition for this encounter, if it needs one beyond the default
     /// "kill everything" rule TurnManager already applies.
     ///
@@ -236,7 +108,7 @@ public class BattleRunner : MonoBehaviour
         {
             case VictoryCondition.DefeatBoss:
                 {
-                    Unit boss = FindSpawnedBoss();
+                    Unit boss = deployment.Boss;
                     if (boss == null)
                     {
                         Debug.LogError("[BattleRunner] Defeat Boss encounter, but the boss didn't " +
@@ -285,25 +157,6 @@ public class BattleRunner : MonoBehaviour
             TurnManager.Instance.RegisterObjective(objective);
     }
 
-    private Unit FindSpawnedBoss()
-    {
-        EncounterData.EnemySpawn bossSpawn = encounter.FindBossSpawn();
-        if (bossSpawn == null) return null;
-
-        foreach (var pair in pendingPlacement)
-        {
-            Unit u = pair.Key;
-            if (u == null || u.team != Team.Enemy) continue;
-
-            string expected = string.IsNullOrWhiteSpace(bossSpawn.nameOverride)
-                ? bossSpawn.definition.unitName
-                : bossSpawn.nameOverride;
-
-            if (u.unitName == expected && pair.Value == bossSpawn.cell) return u;
-        }
-        return null;
-    }
-
     // ---- Results ----
 
     private void HandleCombatEnd(Team? winner)
@@ -314,7 +167,7 @@ public class BattleRunner : MonoBehaviour
         BattleLauncher.RecordResult(encounter, winner);
         GameData data = GameData.Instance;
         if (data != null)
-            PartyResultWriter.Write(deployed, winner == Team.Player, new PartyRules
+            PartyResultWriter.Write(deployment.deployed, winner == Team.Player, new PartyRules
             {
                 permadeath = data.permadeath,
                 reviveHP = data.reviveHP,
@@ -330,7 +183,7 @@ public class BattleRunner : MonoBehaviour
         if (leaving) return;
         leaving = true;
 
-        PartyResultWriter.Restore(hpBeforeBattle);
+        PartyResultWriter.Restore(deployment.hpBeforeBattle);
         SceneManager.LoadScene(SceneManager.GetActiveScene().name);
     }
 
@@ -360,7 +213,7 @@ public class BattleRunner : MonoBehaviour
         ExitDecision decision = BattleExitRouter.Decide(BattleLauncher.LastWinner == Team.Player,
             encounter, SceneManager.GetActiveScene().name, data != null ? data.returnSceneName : null);
         if (decision.Route == ExitRoute.Retry)
-            PartyResultWriter.Restore(hpBeforeBattle);
+            PartyResultWriter.Restore(deployment.hpBeforeBattle);
         else
             BattleLauncher.ClearPending();
         SceneManager.LoadScene(decision.SceneName);
