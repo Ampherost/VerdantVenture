@@ -242,15 +242,32 @@ public class CombatTests
     }
 
     [Test]
-    public void LegacyStats_DeserializeIntoStruct_AndDefinitionCopiesIndependently()
+    public void LegacyFields_DeserializeIntoStruct_AndDefinitionCopiesIndependently()
     {
         var definition = CreateAsset<UnitDefinition>();
-        JsonUtility.FromJsonOverwrite("{\"maxHP\":32,\"attack\":9,\"defense\":7,\"moveRange\":6}", definition);
+        // Exercise OnAfterDeserialize using the actual serialized fields.
+        // Recognition of old asset names via FormerlySerializedAs needs an Editor asset-import test.
+        JsonUtility.FromJsonOverwrite(
+            "{\"legacy_maxHP\":32,\"legacy_currentHP\":12,\"legacy_attack\":9,\"legacy_defense\":7,\"legacy_moveRange\":6}",
+            definition);
+        Assert.That(definition.baseStats.maxHP, Is.EqualTo(32));
+        Assert.That(definition.baseStats.currentHP, Is.EqualTo(12));
+        Assert.That(definition.baseStats.attack, Is.EqualTo(9));
+        Assert.That(definition.baseStats.defense, Is.EqualTo(7));
+        Assert.That(definition.baseStats.resistance, Is.EqualTo(7));
+        Assert.That(definition.baseStats.moveRange, Is.EqualTo(6));
+
         definition.ApplyTo(player);
         Assert.That(player.maxHP, Is.EqualTo(32));
+        Assert.That(player.currentHP, Is.EqualTo(32), "ApplyTo spawns units at full health.");
         Assert.That(player.stats.resistance, Is.EqualTo(7));
         player.stats.attack = 1;
         Assert.That(definition.baseStats.attack, Is.EqualTo(9));
+
+        // Once imported, stale legacy values must not overwrite subsequent edits.
+        definition.baseStats.attack = 11;
+        definition.OnAfterDeserialize();
+        Assert.That(definition.baseStats.attack, Is.EqualTo(11));
     }
 
     [TestCase(49, 19, 11)] // Hit and critical: 3 damage tripled.
