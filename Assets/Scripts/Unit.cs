@@ -12,10 +12,11 @@ public enum Team { Player, Enemy }
 /// A unit holds exactly one cell at a time. PlaceAt() releases the previous cell before
 /// claiming a new one, so teleports / reinforcements / rescue can't leak occupancy.
 /// </summary>
-public class Unit : MonoBehaviour, ISerializationCallbackReceiver
+public partial class Unit : MonoBehaviour, ISerializationCallbackReceiver
 {
     [Header("Identity")]
     public string unitName = "Unit";
+    public UnitDefinition definition;
     public Team team = Team.Player;
 
     [Header("Stats")]

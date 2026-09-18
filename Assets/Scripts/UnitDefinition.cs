@@ -71,6 +71,9 @@ public class UnitDefinition : ScriptableObject, ISerializationCallbackReceiver
         if (unit == null) return;
 
         unit.unitName = unitName;
+        unit.definition = this;
+        unit.currentLevel = 1;
+        unit.currentExp = 0;
         unit.stats = baseStats;
         unit.currentClass = defaultClass;
         unit.currentHP = baseStats.maxHP;

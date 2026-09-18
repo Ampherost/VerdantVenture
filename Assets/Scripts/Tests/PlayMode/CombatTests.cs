@@ -323,6 +323,187 @@ public class CombatTests
         Assert.That(player.currentBurstPips, Is.Zero);
         Assert.That(enemy.currentHP, Is.EqualTo(20));
     }
+    [Test]
+    public void GainExp_125LevelsBareUnitOnceAndLeaves25WithoutStatGains()
+    {
+        UnitStats before = player.stats;
+        Assert.That(player.definition, Is.Null);
+        Assert.That(player.currentClass, Is.Null);
+
+        var results = player.GainExp(125);
+
+        Assert.That(player.currentLevel, Is.EqualTo(2));
+        Assert.That(player.currentExp, Is.EqualTo(25));
+        Assert.That(player.stats, Is.EqualTo(before));
+        Assert.That(results.Count, Is.EqualTo(1));
+        Assert.That(results[0].Level, Is.EqualTo(2));
+        Assert.That(results[0].Gains, Is.EqualTo(default(UnitStats)));
+    }
+
+    [Test]
+    public void GainExp_250LevelsTwiceAndFiresTwoEvents()
+    {
+        int events = 0;
+        player.OnLevelUp += (unit, gains) => events++;
+
+        var results = player.GainExp(250);
+
+        Assert.That(player.currentLevel, Is.EqualTo(3));
+        Assert.That(player.currentExp, Is.EqualTo(50));
+        Assert.That(results.Count, Is.EqualTo(2));
+        Assert.That(events, Is.EqualTo(2));
+        Assert.That(results[0].Level, Is.EqualTo(2));
+        Assert.That(results[1].Level, Is.EqualTo(3));
+    }
+
+    [Test]
+    public void GainExp_AtMaxLevelLeavesLevelAndExpUnchanged()
+    {
+        player.currentLevel = player.MaxLevel;
+        player.currentExp = 7;
+        int events = 0;
+        player.OnLevelUp += (unit, gains) => events++;
+
+        Assert.That(player.GainExp(100), Is.Empty);
+
+        Assert.That(player.currentLevel, Is.EqualTo(20));
+        Assert.That(player.currentExp, Is.EqualTo(7));
+        Assert.That(events, Is.Zero);
+    }
+
+    [Test]
+    public void GainExp_StopsAtClassMaxLevelAndDiscardsRemainingExp()
+    {
+        player.currentClass = CreateAsset<ClassDefinition>();
+        player.currentClass.maxLevel = 2;
+
+        var results = player.GainExp(250);
+
+        Assert.That(player.AtMaxLevel, Is.True);
+        Assert.That(player.currentLevel, Is.EqualTo(2));
+        Assert.That(player.currentExp, Is.Zero);
+        Assert.That(results.Count, Is.EqualTo(1));
+    }
+
+    [Test]
+    public void GainExp_NonPositiveAmountsDoNothing()
+    {
+        player.currentExp = 25;
+        Assert.That(player.GainExp(0), Is.Empty);
+        Assert.That(player.GainExp(-100), Is.Empty);
+        Assert.That(player.currentLevel, Is.EqualTo(1));
+        Assert.That(player.currentExp, Is.EqualTo(25));
+    }
+
+    [Test]
+    public void LevelUp_AppliesClassGrowthAndHPBeforeHealthThenLevelEvents()
+    {
+        player.definition = CreateAsset<UnitDefinition>();
+        player.definition.personalGrowths = default;
+        player.currentClass = CreateAsset<ClassDefinition>();
+        player.currentClass.growthModifiers = new StatGrowths
+        {
+            hp = 100, attack = 100, defense = 100, resistance = 100,
+            speed = 100, skill = 100, luck = 100
+        };
+        player.currentHP = 10;
+        var order = new List<string>();
+        player.OnHPChanged += unit =>
+        {
+            Assert.That(unit.maxHP, Is.EqualTo(21));
+            Assert.That(unit.currentHP, Is.EqualTo(11));
+            Assert.That(unit.currentLevel, Is.EqualTo(2));
+            order.Add("HP");
+        };
+        player.OnLevelUp += (unit, result) =>
+        {
+            Assert.That(result.Level, Is.EqualTo(2));
+            Assert.That(result.Gains.maxHP, Is.EqualTo(1));
+            Assert.That(result.Gains.currentHP, Is.EqualTo(1));
+            Assert.That(result.Gains.moveRange, Is.Zero);
+            order.Add("Level");
+        };
+
+        player.LevelUp(() => 1);
+
+        Assert.That(order, Is.EqualTo(new[] { "HP", "Level" }));
+    }
+
+    [Test]
+    public void LevelUp_WithoutClassUsesOnlyPersonalGrowthsAndRoll100()
+    {
+        player.definition = CreateAsset<UnitDefinition>();
+        player.definition.personalGrowths = new StatGrowths { hp = 100, attack = 50 };
+        Assert.That(player.currentClass, Is.Null);
+        int attackBefore = player.attack;
+
+        player.LevelUp(() => 100);
+
+        Assert.That(player.maxHP, Is.EqualTo(21));
+        Assert.That(player.currentHP, Is.EqualTo(21));
+        Assert.That(player.attack, Is.EqualTo(attackBefore));
+        Assert.That(player.currentLevel, Is.EqualTo(2));
+    }
+
+    [Test]
+    public void ApplyTo_StoresDefinitionAndResetsProgression()
+    {
+        var definition = CreateAsset<UnitDefinition>();
+        player.currentLevel = 9;
+        player.currentExp = 75;
+
+        definition.ApplyTo(player);
+
+        Assert.That(player.definition, Is.SameAs(definition));
+        Assert.That(player.currentLevel, Is.EqualTo(1));
+        Assert.That(player.currentExp, Is.Zero);
+    }
+
+    [Test]
+    public void LevelUp_AtMaxReturnsNullWithoutRollsEventsOrStateChanges()
+    {
+        player.currentLevel = player.MaxLevel;
+        player.currentExp = 7;
+        UnitStats before = player.stats;
+        player.OnHPChanged += unit => Assert.Fail("No HP event at max level.");
+        player.OnLevelUp += (unit, result) => Assert.Fail("No level event at max level.");
+
+        var result = player.LevelUp(() => { Assert.Fail("No rolls at max level."); return 1; });
+
+        Assert.That(result, Is.Null);
+        Assert.That(player.stats, Is.EqualTo(before));
+        Assert.That(player.currentLevel, Is.EqualTo(player.MaxLevel));
+        Assert.That(player.currentExp, Is.EqualTo(7));
+    }
+
+    [Test]
+    public void GainExp_HugeAwardStopsAtLimitWithoutOverflow()
+    {
+        player.currentExp = 99;
+        var results = player.GainExp(int.MaxValue);
+        Assert.That(results.Count, Is.EqualTo(19));
+        Assert.That(player.currentLevel, Is.EqualTo(20));
+        Assert.That(player.currentExp, Is.Zero);
+    }
+
+    [Test]
+    public void LevelUp_UsesClassCapsAndReturnsThePublishedResult()
+    {
+        player.definition = CreateAsset<UnitDefinition>();
+        player.definition.personalGrowths = new StatGrowths { hp = 300, attack = 100 };
+        player.currentClass = CreateAsset<ClassDefinition>();
+        player.currentClass.statCaps = new UnitStats { maxHP = 21, attack = player.attack };
+        LevelUpResult? published = null;
+        player.OnLevelUp += (unit, result) => published = result;
+
+        var result = player.LevelUp(() => 100);
+
+        Assert.That(result.HasValue, Is.True);
+        Assert.That(result, Is.EqualTo(published));
+        Assert.That(result.Value.Gains.maxHP, Is.EqualTo(1));
+        Assert.That(result.Value.Gains.attack, Is.Zero);
+    }
+
     private void AssertEndTurnIsBlocked()
     {
         Assert.That(turns.IsPlayerActionInProgress, Is.True);

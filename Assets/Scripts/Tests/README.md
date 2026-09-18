@@ -26,6 +26,11 @@ committed starter assets; they do not rewrite them.
 
 ## PlayMode coverage
 
+- Progression supports bare units, multiple levels per EXP award, result payloads, class caps,
+  max-level guards, excess-EXP discard and non-positive awards. `ApplyTo` resets progression.
+- Injected growth rolls verify stats are applied before `OnHPChanged`, followed by
+  `OnLevelUp(Unit, LevelUpResult)`. Growth RNG never consumes combat roll queues;
+  the existing `Resolver_*` tests still verify those queues are drained exactly.
 - Damage subtracts defense, with a minimum of one damage.
 - Forecasts do not change HP and match the resolved attack and counterattack.
 - Lethal damage prevents counters, frees the occupied tile, and ends the battle.
@@ -33,7 +38,7 @@ committed starter assets; they do not rewrite them.
 - End Turn is rejected during actual movement and attack coroutines; normal turn
   progression resumes after the action completes.
 
-The last two tests also check the same `CanEndPlayerPhase` property used by the HUD.
+The movement and attack-lock tests also check the same `CanEndPlayerPhase` property used by the HUD.
 They do not simulate a UI click or verify the button's scene wiring.
 
 ## Adding the next test
