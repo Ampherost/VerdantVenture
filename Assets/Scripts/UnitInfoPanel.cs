@@ -82,7 +82,7 @@ public class UnitInfoPanel : MonoBehaviour
             nameText.text = shown.unitName;
             nameText.color = teamColor;
         }
-        if (teamText != null) teamText.text = shown.team == Team.Player ? "Ally" : "Enemy";
+        if (teamText != null) teamText.text = $"{(shown.team == Team.Player ? "Ally" : "Enemy")} · {shown.ClassName}";
         if (hpText != null) hpText.text = $"HP  {shown.currentHP}/{shown.maxHP}";
         if (attackText != null) attackText.text = $"ATK  {shown.TotalAttackPower}";
         if (defenseText != null) defenseText.text = $"Def  {shown.stats.defense} / Res  {shown.stats.resistance}";

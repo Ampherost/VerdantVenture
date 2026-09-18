@@ -12,7 +12,7 @@ flowchart TB
     CMB["<b>Combat core</b><br/>TurnManager, GridManager, Unit,<br/>controllers, objectives, AttackForecast, CombatResolver"]
     ORC["<b>Battle orchestration</b><br/>BattleRunner, Deployment, BattleSpawner,<br/>ObjectiveFactory, PartyResultWriter, BattleExitRouter"]
     UI["<b>Combat UI</b><br/>HUD, panels, health bars, camera"]
-    DATA["<b>Authored data</b><br/>EncounterData, UnitDefinition,<br/>WeaponData, SpecialAttackData, UnitStats"]
+    DATA["<b>Authored data</b><br/>EncounterData, UnitDefinition, ClassDefinition,<br/>WeaponData, SpecialAttackData, UnitStats, StatGrowths"]
 
     OW --> DLG
     DLG -- "UnityEvent → EncounterTrigger" --> OW
@@ -37,7 +37,7 @@ flowchart TB
 | Battle orchestration | `BattleRunner`, `Deployment`, `BattleSpawner`, `ObjectiveFactory`, `PartyResultWriter`, `PartyRules`, `BattleExitRouter`, `ExitDecision`, `ExitRoute` |
 | Combat core | `TurnManager`, `GridManager`, `Unit`, `Team`, `CombatController`, `EnemyPhaseController`, `CombatObjective`, `DefeatBossObjective`, `SurviveRoundsObjective`, `AttackForecast`, `CombatResolver` |
 | Combat UI | `CombatHUD`, `UnitInfoPanel`, `BattleForecastPanel`, `UnitHealthBar`, `CombatCameraController` |
-| Authored data | `EncounterData`, `UnitDefinition`, `WeaponData`, `DamageCategory`, `SpecialAttackData`, `UnitStats` |
+| Authored data | `EncounterData`, `UnitDefinition`, `ClassDefinition`, `ClassTier`, `WeaponData`, `DamageCategory`, `SpecialAttackData`, `UnitStats`, `StatGrowths` |
 | Utility | `SceneManagerScript` (menu buttons) |
 
 ## Rules this diagram should enforce

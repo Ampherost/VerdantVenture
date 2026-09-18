@@ -11,6 +11,8 @@ classDiagram
         +string unitName
         +GameObject prefab
         +UnitStats baseStats
+        +StatGrowths personalGrowths
+        +ClassDefinition defaultClass
         +WeaponData equippedWeapon
         +SpecialAttackData equippedSpecial
         +int AttackRange
@@ -24,6 +26,8 @@ classDiagram
         +string unitName
         +Team team
         +UnitStats stats
+        +ClassDefinition currentClass
+        +string ClassName
         +WeaponData equippedWeapon
         +SpecialAttackData equippedSpecial
         +Vector2Int Cell
@@ -63,6 +67,41 @@ classDiagram
         +int luck
         +int moveRange
         +UnitStats Default$
+        +UnitStats MaxCaps$
+    }
+
+    class StatGrowths {
+        <<struct>>
+        +int hp
+        +int attack
+        +int defense
+        +int resistance
+        +int speed
+        +int skill
+        +int luck
+        +StatGrowths Default$
+    }
+
+    class ClassDefinition {
+        <<ScriptableObject>>
+        +string className
+        +ClassTier tier
+        +int maxLevel
+        +int promotionLevel
+        +StatGrowths growthModifiers
+        +UnitStats promotionBonuses
+        +UnitStats statCaps
+        +List~ClassDefinition~ promotionOptions
+        +CombinedGrowths(UnitDefinition def, ClassDefinition cls)$ StatGrowths
+        +CapsOf(ClassDefinition cls)$ UnitStats
+        +MaxLevelOf(ClassDefinition cls)$ int
+    }
+
+    class ClassTier {
+        <<enumeration>>
+        Base
+        Intermediate
+        Advanced
     }
 
     class WeaponData {
@@ -127,6 +166,14 @@ classDiagram
     }
 
     UnitDefinition *-- UnitStats : baseStats
+    UnitDefinition *-- StatGrowths : personalGrowths
+    UnitDefinition o-- ClassDefinition : defaultClass
+    Unit o-- ClassDefinition : currentClass
+    ClassDefinition *-- StatGrowths : growthModifiers
+    ClassDefinition *-- UnitStats : promotionBonuses / statCaps
+    ClassDefinition o-- "0..*" ClassDefinition : promotionOptions
+    ClassDefinition --> ClassTier
+    ClassDefinition ..> UnitDefinition : CombinedGrowths reads personalGrowths
     Unit *-- UnitStats : stats
     UnitDefinition o-- WeaponData
     UnitDefinition o-- SpecialAttackData
@@ -144,5 +191,8 @@ classDiagram
 ## Reading notes
 
 - **Template vs. instance:** `UnitDefinition` (asset, shared) → `PartyMember` (save-game state, persists across scenes) → `Unit` (scene object, lives for one battle). Keep this three-layer split explicit; it's what lets HP persist between fights.
-- `*--` (composition) = `UnitStats` is copied by value. `o--` (aggregation) = weapons/specials are shared asset references — never mutate them at runtime.
+- `*--` (composition) = `UnitStats` and `StatGrowths` are copied by value. Both support field-wise addition without clamping. `o--` (aggregation) = weapons/specials are shared asset references — never mutate them at runtime.
+- Personal growths are percentage data only: values above 100 are legal, and negative values are preserved until roll time. No growth rolling is implemented yet.
+- Classes hold authored growth modifiers, caps, tiers and promotion options only. `ApplyTo` copies the default class reference onto the unit; changing `currentClass` does not change personal growths or apply promotion bonuses. Promotion and leveling are not implemented yet.
+- `UnitStats.MaxCaps` sets the seven combat ceilings to 99; current HP and movement are never capped and their cap fields are zero. A zero combat cap is reserved to mean uncapped when level-up resolution is added.
 - Legacy proxy properties (`maxHP`, `attack`, `defense`, … on both `Unit` and `UnitDefinition`) are omitted on purpose. If you're keeping them, mark them `[Obsolete]` so the diagram and the code agree.

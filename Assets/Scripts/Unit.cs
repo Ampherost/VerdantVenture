@@ -20,6 +20,8 @@ public class Unit : MonoBehaviour, ISerializationCallbackReceiver
 
     [Header("Stats")]
     public UnitStats stats = UnitStats.Default;
+    public ClassDefinition currentClass;
+    public string ClassName => currentClass != null ? currentClass.className : "—";
     public WeaponData equippedWeapon;
     public SpecialAttackData equippedSpecial;
     public int maxHP { get => stats.maxHP; set => stats.maxHP = value; }

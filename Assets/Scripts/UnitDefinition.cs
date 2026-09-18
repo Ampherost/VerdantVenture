@@ -29,6 +29,9 @@ public class UnitDefinition : ScriptableObject, ISerializationCallbackReceiver
     [Tooltip("Innate per-level growth chances (%) before any class modifier is applied.")]
     public StatGrowths personalGrowths = StatGrowths.Default;
 
+    [Header("Class")]
+    public ClassDefinition defaultClass;
+
     [Header("Equipment")]
     public WeaponData equippedWeapon;
     public SpecialAttackData equippedSpecial;
@@ -69,6 +72,7 @@ public class UnitDefinition : ScriptableObject, ISerializationCallbackReceiver
 
         unit.unitName = unitName;
         unit.stats = baseStats;
+        unit.currentClass = defaultClass;
         unit.currentHP = baseStats.maxHP;
         unit.equippedWeapon = equippedWeapon;
         unit.EquipSpecial(equippedSpecial);

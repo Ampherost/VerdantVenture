@@ -17,6 +17,15 @@ public struct UnitStats
         defense = 2, resistance = 2, moveRange = 4
     };
 
+    /// <summary>Permissive default ceilings for the seven combat stats.</summary>
+    public static UnitStats MaxCaps => new UnitStats
+    {
+        maxHP = 99, attack = 99, defense = 99, resistance = 99,
+        speed = 99, skill = 99, luck = 99,
+        // Current HP and movement are never capped.
+        currentHP = 0, moveRange = 0
+    };
+
     /// <summary>Add every field without clamping. Callers decide how to handle HP and movement.</summary>
     public static UnitStats operator +(UnitStats a, UnitStats b) => new UnitStats
     {
