@@ -21,7 +21,15 @@ public class UnitDefinition : ScriptableObject, ISerializationCallbackReceiver
     public GameObject prefab;
 
     [Header("Base Stats")]
+    // TODO (Issue 1: StatGrowths struct and per-unit innate growth rates): hide template
+    // currentHP in a custom drawer; ApplyTo always spawns at baseStats.maxHP.
     public UnitStats baseStats = UnitStats.Default;
+
+    [Header("Growth")]
+    [Tooltip("Innate per-level growth chances (%) before any class modifier is applied.")]
+    public StatGrowths personalGrowths = StatGrowths.Default;
+
+    [Header("Equipment")]
     public WeaponData equippedWeapon;
     public SpecialAttackData equippedSpecial;
     public int maxHP { get => baseStats.maxHP; set => baseStats.maxHP = value; }

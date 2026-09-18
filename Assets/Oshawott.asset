@@ -24,6 +24,14 @@ MonoBehaviour:
     skill: 3
     luck: 3
     moveRange: 4
+  personalGrowths:
+    hp: 65
+    attack: 50
+    defense: 30
+    resistance: 25
+    speed: 45
+    skill: 45
+    luck: 30
   equippedWeapon: {fileID: 0}
   equippedSpecial: {fileID: 0}
   legacy_maxHP: -1
