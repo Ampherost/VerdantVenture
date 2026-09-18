@@ -22,6 +22,8 @@ public struct StatGrowths
     [Tooltip("Luck growth chance per level (%).")]
     public int luck;
 
+    public static StatGrowths Zero => default;
+
     public static StatGrowths Default => new StatGrowths
     {
         hp = 60, attack = 40, defense = 30, resistance = 30,

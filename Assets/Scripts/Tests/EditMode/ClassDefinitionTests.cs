@@ -33,6 +33,50 @@ public class ClassDefinitionTests
         Assert.That(cls.promotionOptions, Is.Empty);
     }
 
+    [TestCase(false, false)]
+    [TestCase(false, true)]
+    [TestCase(true, false)]
+    [TestCase(true, true)]
+    public void CombinedGrowths_MissingInputsContributeZero(bool hasDefinition, bool hasClass)
+    {
+        var definition = hasDefinition ? Create<UnitDefinition>() : null;
+        var cls = hasClass ? Create<ClassDefinition>() : null;
+        if (definition != null) definition.personalGrowths = new StatGrowths
+            { hp = 60, attack = 40, defense = 30, resistance = 20, speed = 50, skill = 10, luck = 5 };
+        if (cls != null) cls.growthModifiers = new StatGrowths
+            { hp = 10, attack = -50, defense = 20, resistance = -5, speed = 60, skill = 3, luck = -10 };
+        var expected = hasDefinition
+            ? (hasClass
+                ? new StatGrowths { hp = 70, attack = -10, defense = 50, resistance = 15, speed = 110, skill = 13, luck = -5 }
+                : definition.personalGrowths)
+            : (hasClass ? cls.growthModifiers : default(StatGrowths));
+        Assert.That(ClassDefinition.CombinedGrowths(definition, cls), Is.EqualTo(expected));
+        Assert.That(StatGrowths.Zero, Is.EqualTo(default(StatGrowths)));
+    }
+
+    [Test]
+    public void CapsOf_NullClassReturnsMaxCaps()
+    {
+        Assert.That(ClassDefinition.CapsOf(null), Is.EqualTo(UnitStats.MaxCaps));
+    }
+
+    [Test]
+    public void MaxLevelOf_NullClassReturnsDefaultMaxLevel()
+    {
+        Assert.That(ClassDefinition.DefaultMaxLevel, Is.EqualTo(20));
+        Assert.That(ClassDefinition.MaxLevelOf(null), Is.EqualTo(ClassDefinition.DefaultMaxLevel));
+    }
+
+    [Test]
+    public void ClassHelpers_ReturnAuthoredCapsAndLevel()
+    {
+        var cls = Create<ClassDefinition>();
+        cls.statCaps = new UnitStats { maxHP = 40, attack = 25 };
+        cls.maxLevel = 12;
+        Assert.That(ClassDefinition.CapsOf(cls), Is.EqualTo(cls.statCaps));
+        Assert.That(ClassDefinition.MaxLevelOf(cls), Is.EqualTo(12));
+    }
+
     [Test]
     public void ClassSwap_ChangesCombinedGrowthsWithoutChangingPersonalGrowths()
     {

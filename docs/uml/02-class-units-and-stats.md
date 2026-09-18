@@ -80,10 +80,12 @@ classDiagram
         +int skill
         +int luck
         +StatGrowths Default$
+        +StatGrowths Zero$
     }
 
     class ClassDefinition {
         <<ScriptableObject>>
+        +int DefaultMaxLevel$
         +string className
         +ClassTier tier
         +int maxLevel
