@@ -504,6 +504,37 @@ public class CombatTests
         Assert.That(result.Value.Gains.attack, Is.Zero);
     }
 
+    [Test]
+    public void GainExp_ForwardsGrowthRngToEveryLevelAndConsumesSevenRollsPerLevel()
+    {
+        player.definition = CreateAsset<UnitDefinition>();
+        player.definition.personalGrowths = new StatGrowths
+        {
+            hp = 50, attack = 50, defense = 50, resistance = 50,
+            speed = 50, skill = 50, luck = 50
+        };
+        var growthRolls = new Queue<int>(new[]
+        {
+            50, 50, 50, 50, 50, 50, 50,
+            51, 51, 51, 51, 51, 51, 51
+        });
+        var before = player.stats;
+
+        var results = player.GainExp(250, () => growthRolls.Dequeue());
+
+        var gains = new UnitStats
+        {
+            maxHP = 1, currentHP = 1, attack = 1, defense = 1,
+            resistance = 1, speed = 1, skill = 1, luck = 1
+        };
+        Assert.That(results.Count, Is.EqualTo(2));
+        Assert.That(results[0].Gains, Is.EqualTo(gains));
+        Assert.That(results[1].Gains, Is.EqualTo(default(UnitStats)));
+        Assert.That(player.stats, Is.EqualTo(before + gains));
+        Assert.That(player.currentExp, Is.EqualTo(50));
+        Assert.That(growthRolls, Is.Empty);
+    }
+
     private void AssertEndTurnIsBlocked()
     {
         Assert.That(turns.IsPlayerActionInProgress, Is.True);

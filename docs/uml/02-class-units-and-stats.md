@@ -36,7 +36,7 @@ classDiagram
         +int MaxLevel
         +bool AtMaxLevel
         +event OnLevelUp
-        +GainExp(int amount) List~LevelUpResult~
+        +GainExp(int amount, Func~int~ rng) List~LevelUpResult~
         +LevelUp(Func~int~ rng) LevelUpResult?
         +WeaponData equippedWeapon
         +SpecialAttackData equippedSpecial
@@ -226,6 +226,7 @@ classDiagram
 - `*--` (composition) = `UnitStats` and `StatGrowths` are copied by value. Both support field-wise addition without clamping. `o--` (aggregation) = weapons/specials are shared asset references — never mutate them at runtime.
 - Personal growths above 100 grant guaranteed points plus a remainder chance; negative growths become zero at roll time. `LevelUpResolver` uses injected rolls in [1,100], separate from combat's [0,99]. Expected gains round midpoint values away from zero.
 - Classes hold authored growth modifiers, caps, tiers and promotion options only. `ApplyTo` sets the definition and default class and resets level/EXP to 1/0. Changing `currentClass` does not change personal growths or apply promotion bonuses. Promotion is not implemented.
+- Starter assets: Oshawott and Piplup default to Base-tier Squire (zero modifiers/bonuses), whose promotion options are Intermediate-tier Vanguard and Tracker. All three use max level 20, promotion level 10 and `MaxCaps`. Vanguard adds HP/ATK/DEF growth +10 and SPD -5, with promotion bonuses HP +3/ATK +2/DEF +2. Tracker adds SPD +15/SKL +10/LCK +5/DEF -5 growth, with promotion bonuses SPD +2/SKL +2. All other modifiers and bonuses are zero.
 - `UnitStats.MaxCaps` sets the seven combat ceilings to 99. Zero combat caps mean uncapped; an already over-cap stat never loses points. Current HP and movement caps are ignored; HP gains increase current HP by the same amount and movement never grows.
 - `Unit.Progression` is part of the same `Unit` class. Its growths/caps/max-level properties use the null-safe class helpers. Bare units have zero growths and a level limit of 20.
 - `GainExp` returns a result for each level gained and discards excess EXP on reaching the limit. Direct `LevelUp` returns null without side effects at max level. Successful levels apply stats, fire `OnHPChanged`, then `OnLevelUp(Unit, LevelUpResult)`; no UI subscribes here. Combat EXP awards and progression persistence are separate work.

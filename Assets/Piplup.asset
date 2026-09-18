@@ -15,8 +15,8 @@ MonoBehaviour:
   unitName: Unit
   prefab: {fileID: 3846869888202506256, guid: 8561ba63a7415854398791bc32f9b773, type: 3}
   baseStats:
-    maxHP: 20
-    currentHP: 20
+    maxHP: 200
+    currentHP: 200
     attack: 5
     defense: 2
     resistance: 2
@@ -32,6 +32,7 @@ MonoBehaviour:
     speed: 30
     skill: 40
     luck: 35
+  defaultClass: {fileID: 11400000, guid: fdb7130434fc46d3aac34d2823814180, type: 2}
   equippedWeapon: {fileID: 0}
   equippedSpecial: {fileID: 0}
   legacy_maxHP: -1

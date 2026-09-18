@@ -16,6 +16,7 @@ public partial class Unit : MonoBehaviour, ISerializationCallbackReceiver
 {
     [Header("Identity")]
     public string unitName = "Unit";
+    [Tooltip("Optional for hand-placed units. Without a definition or class, leveling grants no stat gains.")]
     public UnitDefinition definition;
     public Team team = Team.Player;
 

@@ -31,6 +31,8 @@ committed starter assets; they do not rewrite them.
 - Injected growth rolls verify stats are applied before `OnHPChanged`, followed by
   `OnLevelUp(Unit, LevelUpResult)`. Growth RNG never consumes combat roll queues;
   the existing `Resolver_*` tests still verify those queues are drained exactly.
+- `GainExp` forwards its optional RNG to every level-up; a two-level award consumes
+  exactly fourteen supplied growth rolls and preserves the remaining EXP.
 - Damage subtracts defense, with a minimum of one damage.
 - Forecasts do not change HP and match the resolved attack and counterattack.
 - Lethal damage prevents counters, frees the occupied tile, and ends the battle.

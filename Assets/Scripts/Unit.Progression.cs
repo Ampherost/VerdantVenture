@@ -32,8 +32,9 @@ public partial class Unit
     /// <summary>
     /// Award EXP, returning one result per level gained. Non-positive awards and awards
     /// at max level do nothing. Reaching max level discards all remaining EXP.
+    /// The optional growth RNG is forwarded to each LevelUp and must return [1,100].
     /// </summary>
-    public List<LevelUpResult> GainExp(int amount)
+    public List<LevelUpResult> GainExp(int amount, Func<int> rng = null)
     {
         var results = new List<LevelUpResult>();
         if (amount <= 0 || AtMaxLevel) return results;
@@ -50,7 +51,7 @@ public partial class Unit
 
             remaining -= needed;
             currentExp = 0;
-            results.Add(LevelUp().Value);
+            results.Add(LevelUp(rng).Value);
         }
         return results;
     }

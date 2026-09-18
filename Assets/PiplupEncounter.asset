@@ -15,11 +15,11 @@ MonoBehaviour:
   combatSceneName: CombatScene
   returnSceneName: 
   playerSpawnCells:
-  - {x: 5, y: 7}
+  - {x: 10, y: 7}
   maxDeployed: 4
   enemies:
   - definition: {fileID: 11400000, guid: b9d26fbc586166e429d7c1efcad1fad0, type: 2}
-    cell: {x: 10, y: 7}
+    cell: {x: 20, y: 7}
     nameOverride: Piplup
     isBoss: 0
   victory: 0
