@@ -9,7 +9,7 @@ flowchart TB
     OW["<b>Overworld</b><br/>player, NPCs, triggers"]
     DLG["<b>Dialogue</b><br/>DialogueManager, DialogueChoice"]
     BRG["<b>Scene bridge + persistence</b><br/>BattleLauncher, GameData, PartyMember"]
-    CMB["<b>Combat core</b><br/>TurnManager, GridManager, Unit,<br/>controllers, objectives, AttackForecast, CombatResolver"]
+    CMB["<b>Combat core</b><br/>TurnManager, GridManager, Unit,<br/>controllers, objectives, AttackForecast, CombatResolver,<br/>LevelUpResolver, ExpRules"]
     ORC["<b>Battle orchestration</b><br/>BattleRunner, Deployment, BattleSpawner,<br/>ObjectiveFactory, PartyResultWriter, BattleExitRouter"]
     UI["<b>Combat UI</b><br/>HUD, panels, health bars, camera"]
     DATA["<b>Authored data</b><br/>EncounterData, UnitDefinition, ClassDefinition,<br/>WeaponData, SpecialAttackData, UnitStats, StatGrowths"]
@@ -35,7 +35,7 @@ flowchart TB
 | Dialogue | `DialogueManager`, `DialogueChoice` |
 | Scene bridge + persistence | `BattleLauncher` (static), `GameData` (DontDestroyOnLoad), `PartyMember` |
 | Battle orchestration | `BattleRunner`, `Deployment`, `BattleSpawner`, `ObjectiveFactory`, `PartyResultWriter`, `PartyRules`, `BattleExitRouter`, `ExitDecision`, `ExitRoute` |
-| Combat core | `TurnManager`, `GridManager`, `Unit`, `Team`, `CombatController`, `EnemyPhaseController`, `CombatObjective`, `DefeatBossObjective`, `SurviveRoundsObjective`, `AttackForecast`, `CombatResolver` |
+| Combat core | `TurnManager`, `GridManager`, `Unit` (including `Unit.Progression`), `Team`, `CombatController`, `EnemyPhaseController`, `CombatObjective`, `DefeatBossObjective`, `SurviveRoundsObjective`, `AttackForecast`, `CombatResolver`, `LevelUpResolver`, `LevelUpResult`, `ExpRules` |
 | Combat UI | `CombatHUD`, `UnitInfoPanel`, `BattleForecastPanel`, `UnitHealthBar`, `CombatCameraController` |
 | Authored data | `EncounterData`, `UnitDefinition`, `ClassDefinition`, `ClassTier`, `WeaponData`, `DamageCategory`, `SpecialAttackData`, `UnitStats`, `StatGrowths` |
 | Utility | `SceneManagerScript` (menu buttons) |

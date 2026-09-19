@@ -62,7 +62,7 @@ classDiagram
     }
     class CombatResolver {
         <<static>>
-        +ResolveCombat(Unit attacker, Unit defender, Func~int~ roll, bool useSpecial) string
+        +ResolveCombat(Unit attacker, Unit defender, Func~int~ roll, bool useSpecial, Func~int~ growthRoll) string
     }
 
     class TurnManager {
@@ -198,6 +198,8 @@ classDiagram
     PartyResultWriter ..> PartyMember : ReadBackFrom before HP rules / RestoreSnapshot
     Unit ..> CombatResolver : Attack
     CombatResolver ..> AttackForecast : combat math
+    CombatResolver ..> ExpRules : EXP math
+    CombatResolver ..> TurnManager : BeginExchange / finally EndExchange
     TurnManager o-- "0..*" CombatObjective
     TurnManager o-- "0..*" Unit
     GridManager o-- "0..*" Unit : occupants
@@ -215,7 +217,7 @@ classDiagram
 
 ## Reading notes
 
-- `BeginExchange`/`EndExchange` form a nestable boundary for death-triggered end checks. `NotifyUnitDied` still publishes `OnUnitDied` immediately; the outermost `EndExchange` performs a pending check once. No production caller opens exchanges yet, so existing combat timing is unchanged. Other direct `CheckCombatEnd` callers are unchanged.
+- `BeginExchange`/`EndExchange` form a nestable boundary for death-triggered end checks. `NotifyUnitDied` still publishes `OnUnitDied` immediately; the outermost `EndExchange` performs a pending check once. `CombatResolver` opens the boundary before strikes and closes it in `finally`, after EXP awards and level-ups, so winning-blow progression is included in party writeback. Other direct `CheckCombatEnd` callers are unchanged.
 - Dashed arrows labelled with an event name point from **publisher → subscriber**. Those are the "good" couplings: `TurnManager` doesn't know who's listening.
 - `CombatController` and `EnemyPhaseController` are two *controllers of the same kind* (one per team) but share no abstraction. They each re-implement "move along path, then maybe attack, then NotifyUnitActed". That's the best candidate for a shared interface — see README.
 - `BattleRunner` owns timing and applies the chosen exit: restore the complete member snapshot for Retry; otherwise clear Pending; then load the chosen scene. Explicit Retry and automatic/Continue RetryBattle use the same `PartyResultWriter.Restore` call. The router never loads scenes.

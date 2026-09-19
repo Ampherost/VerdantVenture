@@ -604,6 +604,147 @@ public class CombatTests
         Assert.That(ends, Is.EqualTo(1));
     }
 
+    [Test]
+    public void Exp_WinningBlowIsAwardedBeforeCombatEndAndPartyWriteback()
+    {
+        var definition = CreateAsset<UnitDefinition>();
+        definition.prefab = player.gameObject;
+        player.definition = definition;
+        var dataRoot = Create("Winning EXP data");
+        dataRoot.SetActive(false);
+        var data = dataRoot.AddComponent<GameData>();
+        data.startingRoster.Add(definition);
+        dataRoot.SetActive(true);
+        var member = data.Party[0];
+        var runner = Create("Winning EXP runner").AddComponent<BattleRunner>();
+        runner.enabled = false;
+        runner.autoReturn = false;
+        const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
+        var deployment = (Deployment)typeof(BattleRunner).GetField("deployment", flags).GetValue(runner);
+        deployment.deployed[player] = member;
+        // Bind the real result writer to OnCombatEnd, without waiting for another frame.
+        typeof(BattleRunner).GetMethod("Start", flags).Invoke(runner, null);
+        int ends = 0;
+        turns.OnCombatEnd += winner =>
+        {
+            ends++;
+            Assert.That(player.currentExp, Is.EqualTo(40));
+            Assert.That(member.exp, Is.EqualTo(40), "Winning-blow EXP must be written to the party.");
+        };
+        enemy.currentHP = 2;
+        var rolls = new Queue<int>(new[] { 0, 99 });
+
+        string log = CombatResolver.ResolveCombat(player, enemy, () => rolls.Dequeue());
+
+        Assert.That(turns.CombatOver, Is.True);
+        Assert.That(turns.Winner, Is.EqualTo(Team.Player));
+        Assert.That(ends, Is.EqualTo(1));
+        Assert.That(enemy.currentExp, Is.Zero);
+        Assert.That(rolls, Is.Empty);
+        Assert.That(log, Does.EndWith("Player gains 40 EXP."));
+    }
+
+    [Test]
+    public void Exp_WhiffStillAwardsMinimumAfterTakingCounter()
+    {
+        player.equippedWeapon.baseHit = 0;
+        var rolls = new Queue<int>(new[] { 99, 0, 99 });
+
+        string log = CombatResolver.ResolveCombat(player, enemy, () => rolls.Dequeue());
+
+        Assert.That(player.currentHP, Is.EqualTo(17));
+        Assert.That(player.currentExp, Is.EqualTo(ExpRules.MinHitExp));
+        Assert.That(enemy.currentExp, Is.Zero);
+        Assert.That(log, Does.EndWith("Player gains 1 EXP."));
+        Assert.That(rolls, Is.Empty);
+    }
+
+    [Test]
+    public void Exp_LevelUpLogFollowsExpAndUsesSeparateSevenRollGrowthQueue()
+    {
+        player.definition = CreateAsset<UnitDefinition>();
+        player.definition.personalGrowths = new StatGrowths
+        {
+            hp = 100, attack = 100, defense = 100, resistance = 100,
+            speed = 100, skill = 100, luck = 100
+        };
+        player.currentExp = 90;
+        var rolls = new Queue<int>(new[] { 0, 99, 0, 99 });
+        var growthRolls = new Queue<int>(new[] { 100, 100, 100, 100, 100, 100, 100 });
+
+        string log = CombatResolver.ResolveCombat(player, enemy, () => rolls.Dequeue(),
+            growthRoll: () => growthRolls.Dequeue());
+
+        Assert.That(player.currentLevel, Is.EqualTo(2));
+        Assert.That(player.currentExp, Is.Zero);
+        Assert.That(player.currentHP, Is.EqualTo(18), "HP growth follows the counter, not the initiating hit.");
+        Assert.That(rolls, Is.Empty);
+        Assert.That(growthRolls, Is.Empty);
+        string[] lines = log.Split('\n');
+        Assert.That(lines[lines.Length - 2].TrimEnd(), Is.EqualTo("Player gains 10 EXP."));
+        Assert.That(lines[lines.Length - 1], Is.EqualTo(
+            "Player → Lv 2! +1 HP +1 ATK +1 DEF +1 RES +1 SPD +1 SKL +1 LCK"));
+    }
+
+    [Test]
+    public void Exp_NoTurnManagerStillResolvesAndAwardsWinningBlow()
+    {
+        Object.DestroyImmediate(turns.gameObject);
+        Assert.That(TurnManager.Instance == null, Is.True);
+        enemy.currentHP = 2;
+        var rolls = new Queue<int>(new[] { 0, 99 });
+
+        string log = CombatResolver.ResolveCombat(player, enemy, () => rolls.Dequeue());
+
+        Assert.That(player.currentExp, Is.EqualTo(40));
+        Assert.That(enemy.IsAlive, Is.False);
+        Assert.That(log, Does.EndWith("Player gains 40 EXP."));
+        Assert.That(rolls, Is.Empty);
+    }
+
+    [Test]
+    public void Exp_PlayerDefenderGetsCounterKillAwardButEnemyGetsNone()
+    {
+        enemy.currentHP = 2;
+        var rolls = new Queue<int>(new[] { 0, 99, 0, 99 });
+
+        string log = CombatResolver.ResolveCombat(enemy, player, () => rolls.Dequeue());
+
+        Assert.That(player.currentExp, Is.EqualTo(40));
+        Assert.That(enemy.currentExp, Is.Zero);
+        Assert.That(turns.CombatOver, Is.True);
+        Assert.That(log, Does.EndWith("Player gains 40 EXP."));
+        Assert.That(rolls, Is.Empty);
+    }
+
+    [Test]
+    public void Exp_PlayerKilledByCounterGetsNoExpOrGrowth()
+    {
+        enemy.attack = 100;
+        player.currentExp = 99;
+        var rolls = new Queue<int>(new[] { 0, 99, 0, 99 });
+
+        string log = CombatResolver.ResolveCombat(player, enemy, () => rolls.Dequeue(),
+            growthRoll: () => { Assert.Fail("A dead player must not roll growth."); return 1; });
+
+        Assert.That(player.IsAlive, Is.False);
+        Assert.That(player.currentExp, Is.EqualTo(99));
+        Assert.That(enemy.currentExp, Is.Zero);
+        Assert.That(log, Does.Not.Contain("EXP"));
+        Assert.That(rolls, Is.Empty);
+    }
+
+    [Test]
+    public void Resolver_ThrowingRollStillClosesExchangeBoundary()
+    {
+        Assert.Throws<System.InvalidOperationException>(() => CombatResolver.ResolveCombat(player, enemy,
+            () => throw new System.InvalidOperationException("Test roll failure")));
+
+        enemy.ApplyDamage(enemy.currentHP);
+
+        Assert.That(turns.CombatOver, Is.True, "A leaked exchange would defer this death indefinitely.");
+    }
+
     private void AssertEndTurnIsBlocked()
     {
         Assert.That(turns.IsPlayerActionInProgress, Is.True);

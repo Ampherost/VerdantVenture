@@ -14,6 +14,8 @@ Each test destroys its objects afterward. Do not enter Play Mode manually first.
 
 ## EditMode coverage
 
+- EXP formulas cover equal and unequal levels, hit/kill minimums, multiple hits plus a kill,
+  whiffs, and integer overflow protection. Constants remain placeholders for balancing.
 - Stat and growth addition sums every field, preserves negatives and accepts a default struct as zero.
 - Personal growth defaults survive importing a legacy asset without the field; explicit zero growths stay zero.
 - Class growth helpers accept every null combination; caps and max level have classless defaults.
@@ -29,6 +31,11 @@ committed starter assets; they do not rewrite them.
 
 ## PlayMode coverage
 
+- Combat awards EXP only to surviving players after the exchange, including counterattack kills
+  and whiffs. Winning-blow EXP reaches `PartyMember` before the single combat-end event completes.
+- EXP log lines precede level-up lines. Separate growth queues consume seven rolls per level
+  while combat queues still drain exactly. Combat also works without a TurnManager;
+  an exception during a strike still closes the exchange boundary.
 - Persistence tests exercise real spawning and battle result writing, then respawn grown units.
   Enemy levels use deterministic expected gains; level-1 overrides and class-limit warnings are checked.
 - Explicit Retry, Continue and automatic RetryBattle routes restore exact snapshots before loading.

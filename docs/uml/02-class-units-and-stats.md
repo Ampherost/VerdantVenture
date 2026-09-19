@@ -78,6 +78,18 @@ classDiagram
         +ExpectedGains(UnitStats current, StatGrowths growths, UnitStats caps, int levels)$ UnitStats
     }
 
+    class ExpRules {
+        <<static>>
+        +int BaseHitExp$
+        +int BaseKillExp$
+        +int PerLevelDelta$
+        +int MinHitExp$
+        +int MinKillExp$
+        +ForHit(int attackerLevel, int defenderLevel)$ int
+        +ForKill(int attackerLevel, int defenderLevel)$ int
+        +ForExchange(int attackerLevel, int defenderLevel, int hitsLanded, bool killed)$ int
+    }
+
     class UnitStats {
         <<struct>>
         +int maxHP
@@ -215,6 +227,8 @@ classDiagram
     UnitDefinition *-- UnitStats : baseStats
     Unit --> UnitDefinition : definition
     Unit ..> LevelUpResolver : resolves gains
+    CombatResolver ..> ExpRules : EXP from pre-exchange levels
+    CombatResolver ..> Unit : GainExp with separate growth RNG
     Unit ..> LevelUpResult : returns / OnLevelUp payload
     LevelUpResult *-- UnitStats : Gains
     Unit ..> ClassDefinition : growths / caps / max level helpers
@@ -256,7 +270,8 @@ classDiagram
 - Starter assets: Oshawott and Piplup default to Base-tier Squire (zero modifiers/bonuses), whose promotion options are Intermediate-tier Vanguard and Tracker. All three use max level 20, promotion level 10 and `MaxCaps`. Vanguard adds HP/ATK/DEF growth +10 and SPD -5, with promotion bonuses HP +3/ATK +2/DEF +2. Tracker adds SPD +15/SKL +10/LCK +5/DEF -5 growth, with promotion bonuses SPD +2/SKL +2. All other modifiers and bonuses are zero.
 - `UnitStats.MaxCaps` sets the seven combat ceilings to 99. Zero combat caps mean uncapped; an already over-cap stat never loses points. Current HP and movement caps are ignored; HP gains increase current HP by the same amount and movement never grows.
 - `Unit.Progression` is part of the same `Unit` class. Its growths/caps/max-level properties use the null-safe class helpers. Bare units have zero growths and a level limit of 20.
-- `GainExp` returns a result for each level gained and discards excess EXP on reaching the limit. Direct `LevelUp` returns null without side effects at max level. Successful levels apply stats, fire `OnHPChanged`, then `OnLevelUp(Unit, LevelUpResult)`; no UI subscribes here. Combat EXP awards are separate work.
+- `GainExp` returns a result for each level gained and discards excess EXP on reaching the limit. Direct `LevelUp` returns null without side effects at max level. Successful levels apply stats, fire `OnHPChanged`, then `OnLevelUp(Unit, LevelUpResult)`; no UI subscribes here.
+- `ExpRules` accepts integers only. Each hit earns max(1, 10 + level difference × 3); a kill adds max(5, 30 + level difference × 6). A whiff earns 1. These are placeholder balance values. `CombatResolver` awards surviving players after all strikes, initiator first, using levels captured before the exchange; its log places each EXP line before that unit's level-up lines. Growth rolls never consume combat rolls.
 - `PartyMember.level == 0` is the serialized initialization sentinel. Seed stats, class and level before resolving HP -1. `MaxHP` reads grown stats. `PartyMember.currentHP` is the sole persistent HP owner; its `stats.currentHP` is dead data. `ApplyTo` copies grown stats before overwriting live HP, while `ReadBackFrom` copies progression only and never writes member HP.
 - Snapshots copy all member fields, including death/active-party flags and class, so retry restores the original state exactly. Progression persists in memory across battles; disk serialization remains future work.
 - Legacy proxy properties (`maxHP`, `attack`, `defense`, … on both `Unit` and `UnitDefinition`) are omitted on purpose. If you're keeping them, mark them `[Obsolete]` so the diagram and the code agree.
