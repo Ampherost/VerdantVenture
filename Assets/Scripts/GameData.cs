@@ -3,8 +3,8 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// One party member's *mutable* state: which unit they are, and how hurt they currently
-/// are. Plain [Serializable] class so it survives scene loads inside GameData without any
+/// One party member's mutable progression and HP. Plain [Serializable] class so it
+/// survives scene loads inside GameData without any
 /// save/load plumbing.
 /// </summary>
 [Serializable]
@@ -12,8 +12,16 @@ public class PartyMember
 {
     public UnitDefinition definition;
 
+    [Tooltip("Level 0 is the serialized sentinel for progression not yet initialized.")]
+    public int level;
+    public int exp;
+    [Tooltip("Grown stats, seeded from the definition once. stats.currentHP is dead data; " +
+             "PartyMember.currentHP is the sole owner of persistent HP.")]
+    public UnitStats stats;
+    public ClassDefinition currentClass;
+
     [Tooltip("HP carried between battles. -1 means 'not initialised yet' — it gets filled " +
-             "from the definition's maxHP the first time the party is built.")]
+             "from grown MaxHP after progression is initialized.")]
     public int currentHP = -1;
 
     [Tooltip("Untick to bench someone without removing them from the roster.")]
@@ -23,15 +31,28 @@ public class PartyMember
     public bool isDead;
 
     public string Name => definition != null ? definition.unitName : "(missing definition)";
-    public int MaxHP => definition != null ? Mathf.Max(1, definition.maxHP) : 1;
+    public int MaxHP => Mathf.Max(1, stats.maxHP);
 
     /// <summary>Can this member be put on the board right now?</summary>
-    public bool IsDeployable =>
-        !isDead && inActiveParty && definition != null && definition.IsSpawnable && currentHP > 0;
+    public bool IsDeployable
+    {
+        get
+        {
+            EnsureInitialised();
+            return !isDead && inActiveParty && definition != null && definition.IsSpawnable && currentHP > 0;
+        }
+    }
 
-    /// <summary>Fill in HP the first time we see this member.</summary>
+    /// <summary>Seed progression before resolving the legacy uninitialized-HP sentinel.</summary>
     public void EnsureInitialised()
     {
+        if (level == 0)
+        {
+            stats = definition != null ? definition.baseStats : default;
+            currentClass = definition != null ? definition.defaultClass : null;
+            level = 1;
+            exp = 0;
+        }
         if (currentHP < 0) currentHP = MaxHP;
         currentHP = Mathf.Clamp(currentHP, 0, MaxHP);
     }
@@ -39,12 +60,74 @@ public class PartyMember
     public void FullHeal()
     {
         if (isDead) return;
+        EnsureInitialised();
         currentHP = MaxHP;
+    }
+
+    /// <summary>Apply template identity/equipment, then grown state and the separately owned HP.</summary>
+    public void ApplyTo(Unit unit)
+    {
+        if (unit == null) return;
+        EnsureInitialised();
+        if (definition != null) definition.ApplyTo(unit);
+        unit.definition = definition;
+        unit.stats = stats;
+        unit.currentLevel = level;
+        unit.currentExp = exp;
+        unit.currentClass = currentClass;
+        unit.currentHP = currentHP;
+    }
+
+    /// <summary>Copy progression only. The result writer handles HP and casualty rules separately.</summary>
+    public void ReadBackFrom(Unit unit)
+    {
+        if (unit == null) return;
+        stats = unit.stats;
+        level = unit.currentLevel;
+        exp = unit.currentExp;
+        currentClass = unit.currentClass;
+    }
+
+    /// <summary>A value copy of all member state before a battle, including death and roster flags.</summary>
+    public readonly struct Snapshot
+    {
+        public readonly UnitDefinition definition;
+        public readonly int currentHP, level, exp;
+        public readonly UnitStats stats;
+        public readonly ClassDefinition currentClass;
+        public readonly bool isDead, inActiveParty;
+
+        public Snapshot(PartyMember member)
+        {
+            definition = member.definition;
+            currentHP = member.currentHP;
+            level = member.level;
+            exp = member.exp;
+            stats = member.stats;
+            currentClass = member.currentClass;
+            isDead = member.isDead;
+            inActiveParty = member.inActiveParty;
+        }
+    }
+
+    public Snapshot CaptureSnapshot() => new Snapshot(this);
+
+    /// <summary>Restore exactly; do not reseed, heal or clear the saved death flag.</summary>
+    public void RestoreSnapshot(Snapshot snapshot)
+    {
+        definition = snapshot.definition;
+        currentHP = snapshot.currentHP;
+        level = snapshot.level;
+        exp = snapshot.exp;
+        stats = snapshot.stats;
+        currentClass = snapshot.currentClass;
+        isDead = snapshot.isDead;
+        inActiveParty = snapshot.inActiveParty;
     }
 }
 
 /// <summary>
-/// The one object that outlives scene loads. Holds the roster, each member's current HP,
+/// The one object that outlives scene loads. Holds the roster, each member's progression and HP,
 /// and where to put the player when a battle sends them back to the overworld.
 ///
 /// SETUP: make a prefab with this component, fill in the starting roster, and drop a copy

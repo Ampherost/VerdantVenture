@@ -19,13 +19,21 @@ Each test destroys its objects afterward. Do not enter Play Mode manually first.
 - Class growth helpers accept every null combination; caps and max level have classless defaults.
 - Swapping a unit's class changes combined growths without mutating the definition's personal growths.
 - Class defaults, template-to-unit class wiring and authored starter class references are checked.
-- Party results cover healing, revival, permadeath and retry HP restoration; exit routing covers victory and defeat destinations.
+- Party results cover healing, revival, permadeath and complete retry snapshot restoration; exit routing covers victory and defeat destinations.
+- Party members initialize serialized level 0 before HP -1, use grown MaxHP, preserve the sole
+  persistent HP field during progression readback, and restore complete snapshots including flags.
+- Casualty writeback preserves gains before revival/permadeath and uses grown HP ceilings.
 
 Growth import tests create temporary assets and remove them afterward. Class asset tests read the
 committed starter assets; they do not rewrite them.
 
 ## PlayMode coverage
 
+- Persistence tests exercise real spawning and battle result writing, then respawn grown units.
+  Enemy levels use deterministic expected gains; level-1 overrides and class-limit warnings are checked.
+- Explicit Retry, Continue and automatic RetryBattle routes restore exact snapshots before loading.
+  These synchronous tests check restored state before Unity processes the requested scene load;
+  they do not verify a game scene reload. Existing exit guards remain covered.
 - Progression supports bare units, multiple levels per EXP award, result payloads, class caps,
   max-level guards, excess-EXP discard and non-positive awards. `ApplyTo` resets progression.
 - Injected growth rolls verify stats are applied before `OnHPChanged`, followed by

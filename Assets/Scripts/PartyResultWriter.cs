@@ -12,7 +12,7 @@ public struct PartyRules
 public static class PartyResultWriter
 {
     /// <summary>
-    /// Push each deployed unit's final HP back onto its party member.
+    /// Push each deployed unit's progression and final HP back onto its party member.
     ///
     /// Permadeath only applies to a won battle: a total party wipe is treated as a retreat,
     /// otherwise a single loss would empty the roster and leave the game unwinnable.
@@ -24,6 +24,10 @@ public static class PartyResultWriter
             Unit unit = pair.Key;
             PartyMember member = pair.Value;
             if (member == null) continue;
+
+            member.EnsureInitialised();
+            // Keep gains even for casualties; revive/heal rules must use the grown MaxHP.
+            member.ReadBackFrom(unit);
 
             // A destroyed GameObject compares equal to null; treat that as a casualty.
             member.currentHP = unit == null ? 0 : Mathf.Max(0, unit.currentHP);
@@ -46,14 +50,13 @@ public static class PartyResultWriter
         if (victory && rules.healAfterBattle) heal?.Invoke();
     }
 
-    /// <summary>Undo the writeback, so retrying a lost battle starts from the same HP.</summary>
-    public static void Restore(IEnumerable<KeyValuePair<PartyMember, int>> hpBeforeBattle)
+    /// <summary>Undo writeback, restoring all pre-battle progression, HP and flags exactly.</summary>
+    public static void Restore(IEnumerable<KeyValuePair<PartyMember, PartyMember.Snapshot>> snapshots)
     {
-        foreach (var pair in hpBeforeBattle)
+        foreach (var pair in snapshots)
         {
             if (pair.Key == null) continue;
-            pair.Key.currentHP = pair.Value;
-            pair.Key.isDead = false;
+            pair.Key.RestoreSnapshot(pair.Value);
         }
     }
 

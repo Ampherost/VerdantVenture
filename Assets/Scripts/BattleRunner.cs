@@ -88,12 +88,12 @@ public class BattleRunner : MonoBehaviour
             }, data.HealAll);
         if (autoReturn) StartCoroutine(ReturnAfterDelay());
     }
-    /// <summary>Restart this battle from the party's pre-battle HP. Backs the Retry button.</summary>
+    /// <summary>Restart from the party's complete pre-battle state. Backs the Retry button.</summary>
     public void Retry()
     {
         if (leaving) return;
         leaving = true;
-        PartyResultWriter.Restore(deployment.hpBeforeBattle);
+        PartyResultWriter.Restore(deployment.snapshotBeforeBattle);
         SceneManager.LoadScene(SceneManager.GetActiveScene().name);
     }
     private IEnumerator ReturnAfterDelay()
@@ -115,7 +115,7 @@ public class BattleRunner : MonoBehaviour
         ExitDecision decision = BattleExitRouter.Decide(BattleLauncher.LastWinner == Team.Player,
             encounter, SceneManager.GetActiveScene().name, data != null ? data.returnSceneName : null);
         if (decision.Route == ExitRoute.Retry)
-            PartyResultWriter.Restore(deployment.hpBeforeBattle);
+            PartyResultWriter.Restore(deployment.snapshotBeforeBattle);
         else
             BattleLauncher.ClearPending();
         SceneManager.LoadScene(decision.SceneName);

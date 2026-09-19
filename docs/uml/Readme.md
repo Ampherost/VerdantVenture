@@ -105,6 +105,6 @@ scene names out by hand. A single `SceneNames` static class of constants prevent
 ## Suggested next diagrams
 
 - **Burst / special attack flow** (sequence) — design the player input path for specials before building it.
-- **Save / load** (class) — `GameData` + `PartyMember` will need serialization soon.
+- **Save / load** (class) — `GameData` + `PartyMember` now retain level, EXP, grown stats, class and separately owned HP in memory across battles. `level == 0` initializes legacy members; retry snapshots restore complete pre-battle state. Disk serialization is still future work; do not serialize `stats.currentHP` as a second HP owner.
 - **Enemy AI decision** (activity/flowchart) — `EnemyPhaseController.TakeEnemyTurn`, before adding more AI behaviours.
 - **Dialogue** (state) — `DialogueManager` open → lines → choice → closed.

@@ -9,6 +9,7 @@ sequenceDiagram
     participant ET as EncounterTrigger
     participant BL as BattleLauncher
     participant GD as GameData
+    participant PM as PartyMember
     participant SM as Unity SceneManager
     participant BR as BattleRunner
     participant BS as BattleSpawner
@@ -31,7 +32,10 @@ sequenceDiagram
     alt encounter exists
         BR->>BS: Spawn(encounter, GameData.Instance)
         BS->>U: deactivate/destroy hand-placed units; instantiate party/enemies
-        BS->>D: record party mapping, pre-battle HP, placement, Boss
+        BS->>PM: EnsureInitialised via IsDeployable; ApplyTo(unit)
+        PM->>U: template identity/equipment, grown stats/level/EXP/class, then owned HP
+        BS->>D: record party mapping, complete member snapshots, placement, Boss
+        BS->>U: enemies: resolve override/default class, expected gains for level - 1, full HP
         BS-->>BR: Deployment
         BR->>OF: Install(encounter, deployment, transform)
         OF->>D: read Boss for boss objective
@@ -58,7 +62,8 @@ sequenceDiagram
     opt GameData exists
         BR->>GD: read permadeath, reviveHP, healAfterBattle
         BR->>PW: Write(deployed, victory, PartyRules, HealAll callback)
-        PW->>PW: write HP/death to PartyMembers
+        PW->>PM: ReadBackFrom(unit): stats/level/EXP/class before casualty rules
+        PW->>PM: write HP/death; revive against grown MaxHP
         opt victory and healAfterBattle
             PW->>GD: HealAll callback
         end
@@ -72,7 +77,7 @@ sequenceDiagram
         Player->>HUD: press Retry
         HUD->>BR: Retry()
         BR->>BR: leaving guard; set leaving
-        BR->>PW: Restore(hpBeforeBattle), clearing isDead
+        BR->>PW: Restore(snapshotBeforeBattle), restoring all fields including isDead
         BR->>SM: reload current scene; retain Pending
     else Continue or automatic return
         alt HUD Continue
@@ -85,7 +90,7 @@ sequenceDiagram
         BR->>ER: Decide(victory, encounter, currentScene, savedReturnScene)
         ER-->>BR: ExitDecision (Route, SceneName)
         alt Retry (defeat + RetryBattle)
-            BR->>PW: Restore(hpBeforeBattle), clearing isDead
+            BR->>PW: Restore(snapshotBeforeBattle), restoring all fields including isDead
             Note over BL: Pending is retained
         else GameOver or ReturnToOverworld
             BR->>BL: ClearPending()

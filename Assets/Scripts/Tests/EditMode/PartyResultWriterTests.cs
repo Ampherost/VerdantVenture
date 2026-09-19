@@ -102,12 +102,52 @@ public class PartyResultWriterTests
     }
 
     [Test]
-    public void RestoreResetsHPAndClearsDeath()
+    public void RestoreResetsAllProgressionAndRestoresSavedDeathFlag()
     {
+        member.EnsureInitialised();
+        member.level = 3;
+        member.exp = 25;
+        member.stats.maxHP = 30;
+        var before = member.CaptureSnapshot();
         member.currentHP = 0;
         member.isDead = true;
-        PartyResultWriter.Restore(new Dictionary<PartyMember, int> { [member] = 12 });
+        member.level = 6;
+        member.exp = 75;
+        member.stats.maxHP = 50;
+        PartyResultWriter.Restore(new Dictionary<PartyMember, PartyMember.Snapshot> { [member] = before });
         Assert.That(member.currentHP, Is.EqualTo(12));
         Assert.That(member.isDead, Is.False);
+        Assert.That(member.level, Is.EqualTo(3));
+        Assert.That(member.exp, Is.EqualTo(25));
+        Assert.That(member.stats, Is.EqualTo(before.stats));
+    }
+
+    [Test]
+    public void ReviveUsesGrownMaxHPAndKeepsCasualtyProgression()
+    {
+        unit.stats.maxHP = 35;
+        unit.currentHP = 0;
+        unit.currentLevel = 4;
+        unit.currentExp = 50;
+        PartyResultWriter.Write(deployed, true, new PartyRules { reviveHP = 99 }, null);
+        Assert.That(member.MaxHP, Is.EqualTo(35));
+        Assert.That(member.currentHP, Is.EqualTo(35));
+        Assert.That(member.level, Is.EqualTo(4));
+        Assert.That(member.exp, Is.EqualTo(50));
+        Assert.That(member.isDead, Is.False);
+    }
+
+    [Test]
+    public void PermadeathRecordsProgressionBeforeMarkingCasualtyDead()
+    {
+        unit.stats.attack = 12;
+        unit.currentLevel = 3;
+        unit.currentExp = 40;
+        unit.currentHP = 0;
+        PartyResultWriter.Write(deployed, true, new PartyRules { permadeath = true }, null);
+        Assert.That(member.stats.attack, Is.EqualTo(12));
+        Assert.That(member.level, Is.EqualTo(3));
+        Assert.That(member.exp, Is.EqualTo(40));
+        Assert.That(member.isDead, Is.True);
     }
 }

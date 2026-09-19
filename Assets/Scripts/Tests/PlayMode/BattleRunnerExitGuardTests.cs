@@ -34,7 +34,7 @@ public class BattleRunnerExitGuardTests
     {
         var member = new PartyMember { currentHP = 2 };
         var deployment = (Deployment)typeof(BattleRunner).GetField("deployment", PrivateInstance).GetValue(runner);
-        deployment.hpBeforeBattle[member] = 12;
+        deployment.snapshotBeforeBattle[member] = new PartyMember { currentHP = 12 }.CaptureSnapshot();
         var delay = (IEnumerator)typeof(BattleRunner).GetMethod("ReturnAfterDelay", PrivateInstance)
             .Invoke(runner, null);
         Assert.That(delay.MoveNext(), Is.True);

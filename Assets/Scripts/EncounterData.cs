@@ -21,7 +21,7 @@ public enum DefeatAction
     /// <summary>Send them back to the overworld, bruised. Forgiving; good default.</summary>
     ReturnToOverworld,
 
-    /// <summary>Reload the battle with the party's pre-battle HP restored.</summary>
+    /// <summary>Reload the battle with the party's complete pre-battle state restored.</summary>
     RetryBattle,
 
     /// <summary>Load a dedicated game over scene.</summary>
@@ -45,6 +45,10 @@ public class EncounterData : ScriptableObject
     public class EnemySpawn
     {
         public UnitDefinition definition;
+
+        [Min(1)] public int level = 1;
+        [Tooltip("Optional class instead of the definition's default class, including at level 1.")]
+        public ClassDefinition classOverride;
 
         [Tooltip("Grid cell to spawn on. These are GridManager cell coordinates, not world " +
                  "position — (0,0) is the bottom-left of the painted map.")]
@@ -108,6 +112,18 @@ public class EncounterData : ScriptableObject
         if (enemies == null || enemies.Count == 0)
             Debug.LogWarning($"[Encounter] '{name}' has no enemies. The battle will resolve " +
                              $"the moment it starts.", this);
+
+        if (enemies != null)
+            foreach (var spawn in enemies)
+            {
+                if (spawn == null) continue;
+                ClassDefinition cls = spawn.classOverride ??
+                    (spawn.definition != null ? spawn.definition.defaultClass : null);
+                int maxLevel = ClassDefinition.MaxLevelOf(cls);
+                if (spawn.level > maxLevel)
+                    Debug.LogWarning($"[Encounter] '{name}' has an enemy at level {spawn.level}, " +
+                                     $"above its class maximum of {maxLevel}.", this);
+            }
 
         if (victory == VictoryCondition.DefeatBoss && FindBossSpawn() == null)
         {

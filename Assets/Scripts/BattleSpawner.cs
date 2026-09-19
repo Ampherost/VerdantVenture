@@ -50,11 +50,10 @@ public static class BattleSpawner
             Unit unit = SpawnUnit(member.definition, cells[slot], Team.Player, null, deployment, context);
             if (unit == null) continue;
 
-            // Carry wounds in from the last fight.
-            unit.currentHP = Mathf.Clamp(member.currentHP, 1, unit.maxHP);
+            member.ApplyTo(unit);
 
             deployment.deployed[unit] = member;
-            deployment.hpBeforeBattle[member] = member.currentHP;
+            deployment.snapshotBeforeBattle[member] = member.CaptureSnapshot();
             slot++;
         }
 
@@ -73,6 +72,15 @@ public static class BattleSpawner
         {
             if (spawn == null || spawn.definition == null) continue;
             Unit unit = SpawnUnit(spawn.definition, spawn.cell, Team.Enemy, spawn.nameOverride, deployment, context);
+            if (unit == null) continue;
+            ClassDefinition cls = spawn.classOverride ?? spawn.definition.defaultClass;
+            unit.currentClass = cls;
+            unit.currentLevel = Mathf.Max(1, spawn.level);
+            if (unit.currentLevel > 1)
+                unit.stats += LevelUpResolver.ExpectedGains(unit.stats,
+                    ClassDefinition.CombinedGrowths(spawn.definition, cls),
+                    ClassDefinition.CapsOf(cls), unit.currentLevel - 1);
+            unit.currentHP = unit.maxHP;
             if (spawn.isBoss && !bossSelected)
             {
                 deployment.Boss = unit;

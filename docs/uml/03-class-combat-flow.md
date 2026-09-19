@@ -21,7 +21,7 @@ classDiagram
     }
     class Deployment {
         +Dictionary deployed
-        +Dictionary hpBeforeBattle
+        +Dictionary snapshotBeforeBattle
         +List~KeyValuePair~ pendingPlacement
         +Unit Boss
     }
@@ -43,7 +43,7 @@ classDiagram
     class PartyResultWriter {
         <<static>>
         +Write(deployed, bool victory, PartyRules rules, Action heal)
-        +Restore(hpBeforeBattle)
+        +Restore(snapshots)
     }
     class BattleExitRouter {
         <<static>>
@@ -160,6 +160,14 @@ classDiagram
         +FindBossSpawn() EnemySpawn
     }
 
+    class EnemySpawn {
+        +UnitDefinition definition
+        +int level
+        +ClassDefinition classOverride
+        +Vector2Int cell
+        +bool isBoss
+    }
+
     CombatObjective <|-- DefeatBossObjective
     CombatObjective <|-- SurviveRoundsObjective
 
@@ -173,12 +181,17 @@ classDiagram
     BattleExitRouter ..> ExitDecision : returns
     ExitDecision --> ExitRoute
     BattleSpawner ..> Deployment : creates
+    BattleSpawner ..> PartyMember : ApplyTo / CaptureSnapshot
+    BattleSpawner ..> LevelUpResolver : ExpectedGains for enemies
+    EncounterData *-- EnemySpawn
+    EnemySpawn o-- ClassDefinition : classOverride
     BattleSpawner ..> TurnManager : RegisterUnit
     BattleSpawner ..> GridManager : CellToWorld
     ObjectiveFactory ..> Deployment : reads Boss
     ObjectiveFactory ..> CombatObjective : configure inactive then activate
     ObjectiveFactory ..> TurnManager : RegisterObjective
     PartyResultWriter ..> PartyRules
+    PartyResultWriter ..> PartyMember : ReadBackFrom before HP rules / RestoreSnapshot
     Unit ..> CombatResolver : Attack
     CombatResolver ..> AttackForecast : combat math
     TurnManager o-- "0..*" CombatObjective
@@ -200,8 +213,9 @@ classDiagram
 
 - Dashed arrows labelled with an event name point from **publisher → subscriber**. Those are the "good" couplings: `TurnManager` doesn't know who's listening.
 - `CombatController` and `EnemyPhaseController` are two *controllers of the same kind* (one per team) but share no abstraction. They each re-implement "move along path, then maybe attack, then NotifyUnitActed". That's the best candidate for a shared interface — see README.
-- `BattleRunner` owns timing and applies the chosen exit: restore HP for Retry; otherwise clear Pending; then load the chosen scene. The router never loads scenes.
+- `BattleRunner` owns timing and applies the chosen exit: restore the complete member snapshot for Retry; otherwise clear Pending; then load the chosen scene. Explicit Retry and automatic/Continue RetryBattle use the same `PartyResultWriter.Restore` call. The router never loads scenes.
 - `PartyResultWriter` receives collections, `PartyRules`, and a heal callback; it never looks up `GameData` or scene objects.
 - Boss identity comes directly from the first eligible `isBoss` spawn, without name/cell matching. Objective fields are assigned before activation and `Awake`.
 
-- `Deployment.deployed` maps Unit to PartyMember; `hpBeforeBattle` maps PartyMember to its original HP; `pendingPlacement` pairs Unit with its requested cell.
+- `Deployment.deployed` maps Unit to PartyMember; `snapshotBeforeBattle` maps PartyMember to its complete pre-battle state (HP, level, EXP, stats, class, definition and flags); `pendingPlacement` pairs Unit with its requested cell.
+- Enemies resolve class override before default class, including at level 1. Higher levels apply deterministic expected gains for level minus one, then spawn at full HP. Validation warns above the resolved class's max level; it does not clamp the authored level to that maximum.

@@ -5,7 +5,8 @@ using UnityEngine;
 public class Deployment
 {
     public readonly Dictionary<Unit, PartyMember> deployed = new Dictionary<Unit, PartyMember>();
-    public readonly Dictionary<PartyMember, int> hpBeforeBattle = new Dictionary<PartyMember, int>();
+    public readonly Dictionary<PartyMember, PartyMember.Snapshot> snapshotBeforeBattle =
+        new Dictionary<PartyMember, PartyMember.Snapshot>();
     public readonly List<KeyValuePair<Unit, Vector2Int>> pendingPlacement =
         new List<KeyValuePair<Unit, Vector2Int>>();
     public Unit Boss;
