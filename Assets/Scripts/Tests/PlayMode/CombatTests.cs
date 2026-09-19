@@ -535,6 +535,75 @@ public class CombatTests
         Assert.That(growthRolls, Is.Empty);
     }
 
+    [Test]
+    public void NotifyUnitDied_OutsideExchangeEndsCombatImmediatelyAfterDeathEvent()
+    {
+        var events = new List<string>();
+        turns.OnUnitDied += unit =>
+        {
+            Assert.That(unit, Is.SameAs(enemy));
+            Assert.That(turns.CombatOver, Is.False);
+            events.Add("Died");
+        };
+        turns.OnCombatEnd += winner =>
+        {
+            Assert.That(winner, Is.EqualTo(Team.Player));
+            events.Add("Ended");
+        };
+
+        enemy.ApplyDamage(enemy.currentHP);
+
+        Assert.That(turns.CombatOver, Is.True);
+        Assert.That(events, Is.EqualTo(new[] { "Died", "Ended" }));
+    }
+
+    [Test]
+    public void NotifyUnitDied_InsideExchangeAnnouncesDeathButEndsOnlyOnceAtEnd()
+    {
+        int deaths = 0;
+        int ends = 0;
+        turns.OnUnitDied += unit => deaths++;
+        turns.OnCombatEnd += winner => ends++;
+        turns.BeginExchange();
+
+        enemy.ApplyDamage(enemy.currentHP);
+
+        Assert.That(deaths, Is.EqualTo(1));
+        Assert.That(enemy.IsAlive, Is.False);
+        Assert.That(turns.CombatOver, Is.False);
+        Assert.That(ends, Is.Zero);
+        turns.EndExchange();
+        Assert.That(turns.CombatOver, Is.True);
+        Assert.That(turns.Winner, Is.EqualTo(Team.Player));
+        Assert.That(ends, Is.EqualTo(1));
+        turns.EndExchange();
+        turns.CheckCombatEnd();
+        Assert.That(ends, Is.EqualTo(1));
+    }
+
+    [Test]
+    public void NotifyUnitDied_NestedExchangesEndCombatOnlyAtOutermostEnd()
+    {
+        int deaths = 0;
+        int ends = 0;
+        turns.OnUnitDied += unit => deaths++;
+        turns.OnCombatEnd += winner => ends++;
+        turns.BeginExchange();
+        turns.BeginExchange();
+
+        enemy.ApplyDamage(enemy.currentHP);
+
+        Assert.That(deaths, Is.EqualTo(1));
+        Assert.That(ends, Is.Zero);
+        turns.EndExchange();
+        Assert.That(turns.CombatOver, Is.False);
+        Assert.That(ends, Is.Zero);
+        turns.EndExchange();
+        Assert.That(turns.CombatOver, Is.True);
+        Assert.That(turns.Winner, Is.EqualTo(Team.Player));
+        Assert.That(ends, Is.EqualTo(1));
+    }
+
     private void AssertEndTurnIsBlocked()
     {
         Assert.That(turns.IsPlayerActionInProgress, Is.True);

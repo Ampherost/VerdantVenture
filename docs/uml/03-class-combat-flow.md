@@ -79,6 +79,10 @@ classDiagram
         +event OnCombatEnd
         -List~Unit~ allUnits
         -CombatObjective[] objectives
+        -int exchangeDepth
+        -bool combatEndPending
+        +BeginExchange()
+        +EndExchange()
         +RegisterUnit(Unit u)
         +UnregisterUnit(Unit u)
         +UnitsOnTeam(Team t) IEnumerable~Unit~
@@ -211,6 +215,7 @@ classDiagram
 
 ## Reading notes
 
+- `BeginExchange`/`EndExchange` form a nestable boundary for death-triggered end checks. `NotifyUnitDied` still publishes `OnUnitDied` immediately; the outermost `EndExchange` performs a pending check once. No production caller opens exchanges yet, so existing combat timing is unchanged. Other direct `CheckCombatEnd` callers are unchanged.
 - Dashed arrows labelled with an event name point from **publisher → subscriber**. Those are the "good" couplings: `TurnManager` doesn't know who's listening.
 - `CombatController` and `EnemyPhaseController` are two *controllers of the same kind* (one per team) but share no abstraction. They each re-implement "move along path, then maybe attack, then NotifyUnitActed". That's the best candidate for a shared interface — see README.
 - `BattleRunner` owns timing and applies the chosen exit: restore the complete member snapshot for Retry; otherwise clear Pending; then load the chosen scene. Explicit Retry and automatic/Continue RetryBattle use the same `PartyResultWriter.Restore` call. The router never loads scenes.

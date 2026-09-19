@@ -74,6 +74,9 @@ public class TurnManager : MonoBehaviour
     // Guards against EndPhase being re-entered while a transition is already in flight.
     private bool resolvingPhaseChange;
 
+    private int exchangeDepth;
+    private bool combatEndPending;
+
     private void Awake()
     {
         if (Instance != null && Instance != this) { Destroy(gameObject); return; }
@@ -152,12 +155,31 @@ public class TurnManager : MonoBehaviour
             EndPhase();
     }
 
-    /// <summary>Call when a unit dies so objectives and the battle can resolve immediately.</summary>
+    /// <summary>Open a nestable exchange that defers death-triggered combat-end checks.</summary>
+    public void BeginExchange() => exchangeDepth++;
+
+    /// <summary>Close an exchange; the outermost end runs any deferred check once. Unmatched ends do nothing.</summary>
+    public void EndExchange()
+    {
+        if (exchangeDepth == 0) return;
+        exchangeDepth--;
+        if (exchangeDepth != 0 || !combatEndPending) return;
+
+        combatEndPending = false;
+        CheckCombatEnd();
+    }
+
+    /// <summary>Announce death immediately; defer its combat-end check only during an exchange.</summary>
     public void NotifyUnitDied(Unit u)
     {
         if (u == null || CombatOver) return;
 
         OnUnitDied?.Invoke(u);
+        if (exchangeDepth > 0)
+        {
+            combatEndPending = true;
+            return;
+        }
         CheckCombatEnd();
     }
 
