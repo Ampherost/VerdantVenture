@@ -2,7 +2,14 @@
 
 Diagrams are written in [Mermaid](https://mermaid.js.org/), so they live in the repo as text,
 render directly on GitHub, and show up in PR diffs next to the code they describe.
-Generated from `russell-dev` @ `43cdf7c` (Sept 2026).
+Reviewed against the working tree at `56556ea` on September 20, 2026, including
+`Assets/Scripts` and the class assets in `Assets/Data/Classes`. These are maintained
+architecture views, not an exhaustive generated API listing; tests and generated input
+implementation details are outside the class diagrams' scope.
+
+The latest review corrected module dependencies, added action guards and special-attack
+APIs, refreshed authored class settings, completed return-position restoration, and
+corrected phase skipping and win-condition evaluation in the state diagrams.
 
 | # | Diagram | Type | Use it when… |
 |---|---------|------|--------------|

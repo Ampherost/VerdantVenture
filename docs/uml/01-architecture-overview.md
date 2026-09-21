@@ -17,6 +17,9 @@ flowchart TB
     OW --> DLG
     DLG -- "UnityEvent → EncounterTrigger" --> OW
     OW --> BRG
+    OW --> DATA
+    BRG -- "BattleLauncher finds PlayerMovement" --> OW
+    BRG -- "PartyMember applies / reads Unit; result uses Team" --> CMB
     ORC --> BRG
     ORC --> CMB
     ORC --> DATA
@@ -25,7 +28,7 @@ flowchart TB
     UI --> CMB
     UI --> ORC
     CMB -. "events: OnPhaseStart, OnHPChanged…" .-> UI
-    CMB -. "CombatController → panels" .-> UI
+    CMB -- "CombatController → panels and camera" --> UI
 
 ```
 
@@ -43,6 +46,6 @@ flowchart TB
 ## Rules this diagram should enforce
 
 - **Data depends on (almost) nothing.** ScriptableObjects and structs never reference scene objects. The one allowed exception is `UnitDefinition` knowing the `Unit` prefab type (`prefab`, `ApplyTo(Unit)`).
-- **UI depends on Combat, never the reverse.** Combat talks to UI only through events (dotted arrows). `CombatController → panels` is the one direct exception today.
+- **UI primarily depends on Combat.** Events are dotted notifications, not stored dependencies. `CombatController` directly calls the panels and `CombatCameraController`; this is the current exception to keeping presentation out of the core.
 - **Scenes only talk through the bridge.** Overworld code never touches `TurnManager`; combat code never touches `PlayerMovement`.
 - **Combat stays in the core.** `Unit.Attack()` calls `CombatResolver.ResolveCombat()`; it does not depend on the scene orchestrator.

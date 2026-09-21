@@ -12,6 +12,8 @@ classDiagram
         +EncounterData debugEncounter
         +bool autoReturn
         -Deployment deployment
+        -bool resultsWritten
+        -bool leaving
         -Awake()
         -Start()
         -HandleCombatEnd(Team? winner)
@@ -71,6 +73,8 @@ classDiagram
         +Team CurrentPhase
         +int RoundNumber
         +bool CombatStarted
+        +bool IsPlayerActionInProgress
+        +bool CanEndPlayerPhase
         +bool CombatOver
         +Team? Winner
         +event OnPhaseStart
@@ -129,6 +133,7 @@ classDiagram
         <<MonoBehaviour · player input>>
         -State state
         -Unit selectedUnit
+        -bool inputLocked
         -HandleLeftClick(Vector2Int c)
         -Select(Unit u)
         -MoveSelectedTo(Vector2Int dest) IEnumerator
@@ -165,11 +170,26 @@ classDiagram
     }
 
     class EnemySpawn {
+        <<EncounterData.EnemySpawn>>
         +UnitDefinition definition
         +int level
         +ClassDefinition classOverride
         +Vector2Int cell
+        +string nameOverride
         +bool isBoss
+    }
+
+    class VictoryCondition {
+        <<enumeration>>
+        RoutEnemies
+        DefeatBoss
+        SurviveRounds
+    }
+    class DefeatAction {
+        <<enumeration>>
+        ReturnToOverworld
+        RetryBattle
+        LoadGameOverScene
     }
 
     CombatObjective <|-- DefeatBossObjective
@@ -188,6 +208,9 @@ classDiagram
     BattleSpawner ..> PartyMember : ApplyTo / CaptureSnapshot
     BattleSpawner ..> LevelUpResolver : ExpectedGains for enemies
     EncounterData *-- EnemySpawn
+    EnemySpawn o-- UnitDefinition : definition
+    EncounterData --> VictoryCondition
+    EncounterData --> DefeatAction
     EnemySpawn o-- ClassDefinition : classOverride
     BattleSpawner ..> TurnManager : RegisterUnit
     BattleSpawner ..> GridManager : CellToWorld
@@ -204,7 +227,11 @@ classDiagram
     TurnManager o-- "0..*" Unit
     GridManager o-- "0..*" Unit : occupants
 
-    CombatController ..> TurnManager : NotifyUnitActed
+    CombatController ..> TurnManager : action guard / NotifyUnitActed
+    CombatController ..> Unit : MoveAlong / PreviewAttack / Attack
+    CombatController --> UnitInfoPanel : Show / Hide
+    CombatController --> BattleForecastPanel : Show / Hide
+    CombatController --> CombatCameraController : FocusOn
     CombatController ..> GridManager : paths, reachable
     EnemyPhaseController ..> TurnManager : NotifyUnitActed
     EnemyPhaseController ..> GridManager : distance fields
@@ -213,10 +240,12 @@ classDiagram
     TurnManager ..> CombatHUD : OnPhaseStart / OnRoundStart / OnCombatEnd
     TurnManager ..> BattleRunner : OnCombatEnd
     CombatHUD ..> BattleRunner : Retry / ReturnNow
+    CombatHUD ..> TurnManager : CanEndPlayerPhase / EndPhaseEarly
 ```
 
 ## Reading notes
 
+- `IsPlayerActionInProgress` has a public getter and internal setter. `CombatController` sets it during movement and attack resolution (including the pause), clearing it in `finally`. `CanEndPlayerPhase` requires started, unresolved player combat with no action in progress; both the HUD button and `EndPhaseEarly(Player)` honor it.
 - `BeginExchange`/`EndExchange` form a nestable boundary for death-triggered end checks. `NotifyUnitDied` still publishes `OnUnitDied` immediately; the outermost `EndExchange` performs a pending check once. `CombatResolver` opens the boundary before strikes and closes it in `finally`, after EXP awards and level-ups, so winning-blow progression is included in party writeback. Other direct `CheckCombatEnd` callers are unchanged.
 - Dashed arrows labelled with an event name point from **publisher → subscriber**. Those are the "good" couplings: `TurnManager` doesn't know who's listening.
 - `CombatController` and `EnemyPhaseController` are two *controllers of the same kind* (one per team) but share no abstraction. They each re-implement "move along path, then maybe attack, then NotifyUnitActed". That's the best candidate for a shared interface — see README.

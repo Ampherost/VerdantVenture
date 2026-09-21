@@ -16,6 +16,7 @@ classDiagram
         +WeaponData equippedWeapon
         +SpecialAttackData equippedSpecial
         +int AttackRange
+        +int MinAttackRange
         +bool IsSpawnable
         +ApplyTo(Unit unit)
         +OnAfterDeserialize()
@@ -43,7 +44,12 @@ classDiagram
         +Vector2Int Cell
         +bool HasActed
         +bool IsAlive
+        +bool IsOnGrid
+        +bool IsMoving
         +int currentBurstPips
+        +int MaxBurstPips
+        +bool HasSpecial
+        +bool CanUseSpecial
         +event OnHPChanged
         +event OnDied
         +SnapToGrid()
@@ -58,10 +64,14 @@ classDiagram
         +int TotalCritRate
         +GainBurstPip(int amount)
         +ConsumeBurst()
+        +EquipSpecial(SpecialAttackData newSpecial)
         +CanAttack(Unit target) bool
         +CanAttackFrom(Vector2Int myCell, Unit target, Vector2Int targetCell) bool
         +PreviewAttack(Unit target) AttackForecast
+        +PreviewAttack(Unit target, Vector2Int fromCell) AttackForecast
+        +PreviewAttack(Unit target, Vector2Int fromCell, bool useSpecial) AttackForecast
         +Attack(Unit target) string
+        +Attack(Unit target, bool useSpecial) string
         -Die()
     }
 
@@ -174,6 +184,16 @@ classDiagram
         +int counterStrikes
         +bool targetCounters
         +bool targetDies
+        +bool isValid
+        +bool usesSpecial
+        +int counterDamage
+        +int counterHitChance
+        +int counterCritChance
+        +int attackerHPBefore
+        +int attackerHPAfter
+        +int targetHPBefore
+        +int targetHPAfter
+        +bool attackerDies
         +Damage(Unit a, Unit d, SpecialAttackData s)$ int
         +HitChance(Unit a, Unit d)$ int
         +CritChance(Unit a, Unit d, bool special)$ int
@@ -267,11 +287,12 @@ classDiagram
 - `*--` (composition) = `UnitStats` and `StatGrowths` are copied by value. Both support field-wise addition without clamping. `o--` (aggregation) = weapons/specials are shared asset references — never mutate them at runtime.
 - Personal growths above 100 grant guaranteed points plus a remainder chance; negative growths become zero at roll time. `LevelUpResolver` uses injected rolls in [1,100], separate from combat's [0,99]. Expected gains round midpoint values away from zero.
 - Classes hold authored growth modifiers, caps, tiers and promotion options only. `ApplyTo` sets the definition and default class and resets level/EXP to 1/0. Changing `currentClass` does not change personal growths or apply promotion bonuses. Promotion is not implemented.
-- Starter assets: Oshawott and Piplup default to Base-tier Squire (zero modifiers/bonuses), whose promotion options are Intermediate-tier Vanguard and Tracker. All three use max level 20, promotion level 10 and `MaxCaps`. Vanguard adds HP/ATK/DEF growth +10 and SPD -5, with promotion bonuses HP +3/ATK +2/DEF +2. Tracker adds SPD +15/SKL +10/LCK +5/DEF -5 growth, with promotion bonuses SPD +2/SKL +2. All other modifiers and bonuses are zero.
+- Current class assets in `Assets/Data/Classes` are Adept, Duelist, Scout and Vanguard. All are authored as Base tier with max level 20, promotion level 10 and `MaxCaps`. Duelist references Vanguard and Scout as promotion options; their authored tiers are still Base. Growth modifiers are Adept ATK/SKL +5, Duelist ATK/SPD +5, Scout SPD/SKL +5, and Vanguard HP/DEF +5. Scout has SPD/SKL +2 promotion bonuses; Vanguard has HP +3/ATK +2/DEF +2. Other modifiers/bonuses are zero. These are asset settings, not an implemented promotion flow.
 - `UnitStats.MaxCaps` sets the seven combat ceilings to 99. Zero combat caps mean uncapped; an already over-cap stat never loses points. Current HP and movement caps are ignored; HP gains increase current HP by the same amount and movement never grows.
 - `Unit.Progression` is part of the same `Unit` class. Its growths/caps/max-level properties use the null-safe class helpers. Bare units have zero growths and a level limit of 20.
 - `GainExp` returns a result for each level gained and discards excess EXP on reaching the limit. Direct `LevelUp` returns null without side effects at max level. Successful levels apply stats, fire `OnHPChanged`, then `OnLevelUp(Unit, LevelUpResult)`; no UI subscribes here.
 - `ExpRules` accepts integers only. Each hit earns max(1, 10 + level difference × 3); a kill adds max(5, 30 + level difference × 6). A whiff earns 1. These are placeholder balance values. `CombatResolver` awards surviving players after all strikes, initiator first, using levels captured before the exchange; its log places each EXP line before that unit's level-up lines. Growth rolls never consume combat rolls.
 - `PartyMember.level == 0` is the serialized initialization sentinel. Seed stats, class and level before resolving HP -1. `MaxHP` reads grown stats. `PartyMember.currentHP` is the sole persistent HP owner; its `stats.currentHP` is dead data. `ApplyTo` copies grown stats before overwriting live HP, while `ReadBackFrom` copies progression only and never writes member HP.
 - Snapshots copy all member fields, including death/active-party flags and class, so retry restores the original state exactly. Progression persists in memory across battles; disk serialization remains future work.
-- Legacy proxy properties (`maxHP`, `attack`, `defense`, … on both `Unit` and `UnitDefinition`) are omitted on purpose. If you're keeping them, mark them `[Obsolete]` so the diagram and the code agree.
+- Legacy proxy properties (`maxHP`, `attack`, `defense`, … on both `Unit` and `UnitDefinition`) are omitted for readability; they remain active forwarding properties and are not marked `[Obsolete]`.
+- Special attacks are supported by the `Unit` overloads and resolver, but both turn controllers currently call ordinary `Attack(target)`. Specials replace only the initiating strike, require charge before the exchange, consume charge, and then gain one initiation pip; a KO grants another pip. Forecast HP projections assume hits without criticals.

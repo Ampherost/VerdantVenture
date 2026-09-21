@@ -20,11 +20,15 @@ sequenceDiagram
     participant PW as PartyResultWriter
     participant ER as BattleExitRouter
     participant HUD as CombatHUD
+    participant OP as OverworldPlayerPlacer
 
     Player->>ET: dialogue choice → Begin()
     ET->>BL: Begin(encounter)
-    BL->>BL: encounter.Validate()
-    BL->>GD: SetReturnPoint(scene, playerPos)
+    BL->>BL: encounter.Validate(); abort if null or invalid
+    BL->>BL: set Pending; clear HasResult and LastWinner
+    opt GameData exists
+        BL->>GD: SetReturnPoint(scene, playerPos)
+    end
     BL->>SM: LoadScene(combatSceneName)
 
     Note over BR,U: Combat scene loads; BattleRunner execution order is -100
@@ -98,6 +102,11 @@ sequenceDiagram
         BR->>SM: LoadScene(decision.SceneName)
     end
     Note over BR,SM: A later Continue/delay call stops at leaving; no second load
+    opt loaded scene has OverworldPlayerPlacer and matches saved return point
+        OP->>GD: Start: read hasReturnPoint, returnSceneName, returnPosition
+        OP->>OP: set player position to returnPosition + offset
+        OP->>GD: ClearReturnPoint()
+    end
 ```
 
 `BattleExitRouter` chooses Retry only for a defeat with `RetryBattle`. Defeat with
@@ -108,3 +117,8 @@ Victory ignores the defeat action. A draw follows the defeat path.
 Automatic return starts only after results are recorded and written. With `autoReturn` off,
 the HUD drives the exit. Both `Retry()` and `ReturnNow()` set `leaving` before any scene load.
 `ReturnAfterDelay` uses scaled time (`WaitForSeconds`), as before.
+
+The diagram follows a valid launch; invalid encounters stop before setting Pending or loading
+a scene. `OverworldPlayerPlacer` consumes a return point only in its saved scene.
+The HUD shows Continue on victory and Retry/Main Menu on defeat or draw. The return router's
+defeat branches are reached by automatic return or another caller of `ReturnNow()`.
