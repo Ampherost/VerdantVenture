@@ -15,7 +15,7 @@ MonoBehaviour:
   className: Adept
   tier: 0
   maxLevel: 20
-  promotionLevel: 10
+  promotionLevel: 5
   growthModifiers:
     hp: 0
     attack: 5
@@ -25,13 +25,13 @@ MonoBehaviour:
     skill: 5
     luck: 0
   promotionBonuses:
-    maxHP: 0
-    currentHP: 0
-    attack: 0
+    maxHP: 1
+    currentHP: 1
+    attack: 1
     defense: 0
     resistance: 0
     speed: 0
-    skill: 0
+    skill: 1
     luck: 0
     moveRange: 0
   statCaps:

@@ -15,7 +15,7 @@ MonoBehaviour:
   className: Scout
   tier: 0
   maxLevel: 20
-  promotionLevel: 10
+  promotionLevel: 5
   growthModifiers:
     hp: 0
     attack: 0
@@ -23,16 +23,16 @@ MonoBehaviour:
     resistance: 0
     speed: 5
     skill: 5
-    luck: 0
+    luck: 5
   promotionBonuses:
-    maxHP: 0
-    currentHP: 0
+    maxHP: 1
+    currentHP: 1
     attack: 0
     defense: 0
     resistance: 0
-    speed: 2
-    skill: 2
-    luck: 0
+    speed: 1
+    skill: 1
+    luck: 1
     moveRange: 0
   statCaps:
     maxHP: 99

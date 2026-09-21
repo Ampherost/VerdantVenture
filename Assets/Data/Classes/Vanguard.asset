@@ -15,7 +15,7 @@ MonoBehaviour:
   className: Vanguard
   tier: 0
   maxLevel: 20
-  promotionLevel: 10
+  promotionLevel: 5
   growthModifiers:
     hp: 5
     attack: 0
@@ -25,10 +25,10 @@ MonoBehaviour:
     skill: 0
     luck: 0
   promotionBonuses:
-    maxHP: 3
-    currentHP: 0
-    attack: 2
-    defense: 2
+    maxHP: 2
+    currentHP: 2
+    attack: 1
+    defense: 1
     resistance: 0
     speed: 0
     skill: 0
