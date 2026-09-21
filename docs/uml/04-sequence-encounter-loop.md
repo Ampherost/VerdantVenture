@@ -24,26 +24,26 @@ sequenceDiagram
 
     Player->>ET: dialogue choice → Begin()
     ET->>BL: Begin(encounter)
-    BL->>BL: encounter.Validate(); abort if null or invalid
-    BL->>BL: set Pending; clear HasResult and LastWinner
+    BL->>BL: encounter.Validate(), abort if null or invalid
+    BL->>BL: set Pending, clear HasResult and LastWinner
     opt GameData exists
         BL->>GD: SetReturnPoint(scene, playerPos)
     end
     BL->>SM: LoadScene(combatSceneName)
 
-    Note over BR,U: Combat scene loads; BattleRunner execution order is -100
+    Note over BR,U: Combat scene loads, BattleRunner execution order is -100
     BR->>BL: Awake: read Pending (else debugEncounter)
     alt encounter exists
         BR->>BS: Spawn(encounter, GameData.Instance)
-        BS->>U: deactivate/destroy hand-placed units; instantiate party/enemies
-        BS->>PM: EnsureInitialised via IsDeployable; ApplyTo(unit)
+        BS->>U: deactivate/destroy hand-placed units, instantiate party/enemies
+        BS->>PM: EnsureInitialised via IsDeployable, ApplyTo(unit)
         PM->>U: template identity/equipment, grown stats/level/EXP/class, then owned HP
         BS->>D: record party mapping, complete member snapshots, placement, Boss
         BS->>U: enemies: resolve override/default class, expected gains for level - 1, full HP
         BS-->>BR: Deployment
         BR->>OF: Install(encounter, deployment, transform)
         OF->>D: read Boss for boss objective
-        OF->>OF: create inactive object; add component; configure; activate
+        OF->>OF: create inactive object, add component, configure, activate
         opt TurnManager already exists
             OF->>TM: RegisterObjective(objective)
         end
@@ -53,7 +53,7 @@ sequenceDiagram
     TM->>TM: Awake: sweep active units and objectives
     BR->>BS: Start: Place(deployment, GridManager.Instance)
     BS->>U: set transform.position (never PlaceAt)
-    BR->>TM: subscribe OnCombatEnd; handle already-finished battle
+    BR->>TM: subscribe OnCombatEnd, handle already-finished battle
     U->>U: Start → SnapToGrid()
     TM->>TM: next frame: BeginPhase(Player)
     loop until CheckCombatEnd resolves
@@ -67,7 +67,7 @@ sequenceDiagram
         BR->>GD: read permadeath, reviveHP, healAfterBattle
         BR->>PW: Write(deployed, victory, PartyRules, HealAll callback)
         PW->>PM: ReadBackFrom(unit): stats/level/EXP/class before casualty rules
-        PW->>PM: write HP/death; revive against grown MaxHP
+        PW->>PM: write HP/death, revive against grown MaxHP
         opt victory and healAfterBattle
             PW->>GD: HealAll callback
         end
@@ -80,9 +80,9 @@ sequenceDiagram
     alt explicit HUD Retry
         Player->>HUD: press Retry
         HUD->>BR: Retry()
-        BR->>BR: leaving guard; set leaving
+        BR->>BR: leaving guard, set leaving
         BR->>PW: Restore(snapshotBeforeBattle), restoring all fields including isDead
-        BR->>SM: reload current scene; retain Pending
+        BR->>SM: reload current scene, retain Pending
     else Continue or automatic return
         alt HUD Continue
             Player->>HUD: press Continue
@@ -90,7 +90,7 @@ sequenceDiagram
         else autoReturn enabled
             BR->>BR: delay expires → ReturnNow()
         end
-        Note over BR: ReturnNow stops if leaving or unresolved; otherwise sets leaving
+        Note over BR: ReturnNow stops if leaving or unresolved, otherwise sets leaving
         BR->>ER: Decide(victory, encounter, currentScene, savedReturnScene)
         ER-->>BR: ExitDecision (Route, SceneName)
         alt Retry (defeat + RetryBattle)
@@ -101,7 +101,7 @@ sequenceDiagram
         end
         BR->>SM: LoadScene(decision.SceneName)
     end
-    Note over BR,SM: A later Continue/delay call stops at leaving; no second load
+    Note over BR,SM: A later Continue/delay call stops at leaving, no second load
     opt loaded scene has OverworldPlayerPlacer and matches saved return point
         OP->>GD: Start: read hasReturnPoint, returnSceneName, returnPosition
         OP->>OP: set player position to returnPosition + offset
